@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+    <title>Mega Lanche Galvão | Cardápio Digital & Delivery</title>
+    <meta name="description" content="Cardápio digital oficial do Mega Lanche Galvão. As famosas Barcas com lanches e batata recheada, hambúrgueres artesanais, pastéis crocantes e bebidas geladas. Disk Delivery e Retirada no Local." />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:title" content="Mega Lanche Galvão | Sabor que faz a diferença!" />
+    <meta property="og:description" content="Barcas com lanches, X-Burgers, pastéis e refrigerantes. Faça seu pedido online com entrega rápida ou retirada!" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/images/mega/logo-banner.jpg" />
+    <link rel="icon" type="image/jpeg" href="/images/mega/logo-banner.jpg" />
+    <link rel="apple-touch-icon" href="/images/mega/logo-banner.jpg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#F1F3F6] text-[#1E293B] antialiased selection:bg-[#DC2626] selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Remover qualquer balão ou drawer de feedback injetado pela Netlify
+      (function() {
+        var hideNetlify = function() {
+          var bad = document.querySelectorAll('netlify-drawer, [data-netlify-drawer], #netlify-drawer, iframe[id*="netlify"], .netlify-feedback-badge');
+          bad.forEach(function(el) { if (el && el.parentNode) el.parentNode.removeChild(el); });
+        };
+        if (typeof MutationObserver !== 'undefined') {
+          new MutationObserver(hideNetlify).observe(document.documentElement, { childList: true, subtree: true });
+        }
+        window.addEventListener('DOMContentLoaded', hideNetlify);
+        window.addEventListener('load', hideNetlify);
+      })();
+    </script>
+  </body>
+</html>
