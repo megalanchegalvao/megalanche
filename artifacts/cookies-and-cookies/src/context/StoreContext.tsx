@@ -52,8 +52,9 @@ interface StoreContextType {
   updateHeroInfo: (info: Partial<HeroInfo>) => Promise<void>;
   resetToDefaults: () => void;
 
-  // Upload de Imagens
+  // Upload de Imagens e Sincronização
   processImageFile: (file: File) => Promise<string>;
+  syncAllToSupabase: () => Promise<{ success: boolean; count: number; error?: string }>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -255,10 +256,48 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               const base = prev && prev.length > 0 ? prev : INITIAL_PRODUCTS;
               const merged = base.map((p) => {
                 const found = mappedProducts.find((dbP) => dbP.id === p.id);
-                return found ? { ...p, ...found } : p;
+                if (!found) return p;
+                // Se o produto local do usuário possui foto modificada (ex: base64), não deixa sobrescrever
+                if (p.image && p.image.startsWith('data:image/')) {
+                  return { ...found, ...p, image: p.image };
+                }
+                return { ...p, ...found };
               });
               const additions = mappedProducts.filter((dbP) => !base.some((p) => p.id === dbP.id));
-              return [...merged, ...additions];
+              const finalList = [...merged, ...additions];
+
+              // Envia qualquer foto base64 pendente em segundo plano para o Supabase Storage
+              setTimeout(async () => {
+                for (const item of finalList) {
+                  if (item.image && item.image.startsWith('data:image/')) {
+                    try {
+                      const cloudUrl = await uploadBase64ImageToStorage(item.image);
+                      if (cloudUrl) {
+                        item.image = cloudUrl;
+                        await supabase.from('megalanche_products').upsert([{
+                          id: item.id,
+                          name: item.name,
+                          tagline: item.tagline,
+                          description: item.description,
+                          category: item.category,
+                          image: cloudUrl,
+                          images: item.images || [],
+                          available: item.available,
+                          ingredients_badge: item.ingredientsBadge || '',
+                          options: (item.options || []).map((o) => ({ ...o, images: [cloudUrl] })),
+                        }]);
+                        setProducts((curr) =>
+                          curr.map((cp) => (cp.id === item.id ? { ...cp, image: cloudUrl } : cp))
+                        );
+                      }
+                    } catch (e) {
+                      console.warn('Erro ao subir imagem pendente:', e);
+                    }
+                  }
+                }
+              }, 200);
+
+              return finalList;
             });
           } else {
             // Se o banco foi criado agora mas está vazio, tenta migrar o cardápio que o usuário já editou localmente
@@ -304,6 +343,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             isActive: c.is_active ?? true,
           }));
           setCoupons(mappedCoupons);
+        }
+
+        const { data: dbSettings, error: setErr } = await supabase.from('megalanche_settings').select('*').limit(1).maybeSingle();
+        if (!setErr && dbSettings) {
+          setStoreInfo((prev) => ({
+            ...prev,
+            name: dbSettings.store_name || prev.name,
+            tagline: dbSettings.tagline || prev.tagline,
+            city: dbSettings.city || prev.city,
+            address: dbSettings.address || prev.address,
+            whatsappNumber: dbSettings.whatsapp_number || prev.whatsappNumber,
+            whatsappDisplay: dbSettings.whatsapp_display || prev.whatsappDisplay,
+            pixKey: dbSettings.pix_key || prev.pixKey,
+            instagramHandle: dbSettings.instagram_handle || prev.instagramHandle,
+            instagramUrl: dbSettings.instagram_url || prev.instagramUrl,
+            logoImage: dbSettings.logo_image || prev.logoImage,
+            openingHours: dbSettings.opening_hours || prev.openingHours,
+            adminPin: dbSettings.admin_pin || prev.adminPin,
+          }));
         }
       } catch (err) {
         console.info('Supabase sync standby:', err);
@@ -604,9 +662,113 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  // Sincronizar TUDO para o Supabase (produtos, cupons, settings)
+  const syncAllToSupabase = async (): Promise<{ success: boolean; count: number; error?: string }> => {
+    let syncedCount = 0;
+    try {
+      // 1. Sincronizar todos os produtos
+      for (const prod of products) {
+        let finalImage = prod.image;
+
+        // Se a imagem é base64, faz upload para o Storage primeiro
+        if (finalImage && finalImage.startsWith('data:image/')) {
+          try {
+            const cloudUrl = await uploadBase64ImageToStorage(finalImage);
+            if (cloudUrl) {
+              finalImage = cloudUrl;
+              // Atualiza o estado local também
+              setProducts((prev) =>
+                prev.map((p) => (p.id === prod.id ? { ...p, image: cloudUrl } : p))
+              );
+            }
+          } catch (imgErr) {
+            console.warn('Erro ao subir imagem do produto', prod.id, imgErr);
+          }
+        }
+
+        // Faz upsert do produto no Supabase
+        const payload = {
+          id: prod.id,
+          name: prod.name,
+          tagline: prod.tagline,
+          description: prod.description,
+          category: prod.category,
+          image: finalImage,
+          images: prod.images || [],
+          available: prod.available,
+          ingredients_badge: prod.ingredientsBadge || '',
+          options: (prod.options || []).map((o) => ({
+            ...o,
+            images: finalImage && finalImage.startsWith('http') ? [finalImage] : (o.images || []),
+          })),
+        };
+
+        const { error: upsertErr } = await supabase.from('megalanche_products').upsert([payload]);
+        if (!upsertErr) {
+          syncedCount++;
+        } else {
+          console.warn('Erro upsert produto', prod.id, upsertErr);
+        }
+      }
+
+      // 2. Sincronizar cupons
+      for (const coupon of coupons) {
+        await supabase.from('megalanche_coupons').upsert([{
+          id: coupon.id,
+          code: coupon.code,
+          description: coupon.description,
+          type: coupon.type,
+          value: coupon.value,
+          min_order_value: coupon.minOrderValue || 0,
+          is_active: coupon.isActive,
+        }]);
+      }
+
+      // 3. Sincronizar configurações da loja
+      await supabase.from('megalanche_settings').upsert([{
+        id: 'default',
+        store_name: storeInfo.name,
+        tagline: storeInfo.tagline,
+        city: storeInfo.city,
+        address: storeInfo.address,
+        whatsapp_number: storeInfo.whatsappNumber,
+        whatsapp_display: storeInfo.whatsappDisplay,
+        pix_key: storeInfo.pixKey,
+        instagram_handle: storeInfo.instagramHandle,
+        instagram_url: storeInfo.instagramUrl,
+        logo_image: storeInfo.logoImage,
+        opening_hours: storeInfo.openingHours,
+        admin_pin: storeInfo.adminPin,
+      }]);
+
+      return { success: true, count: syncedCount };
+    } catch (err: any) {
+      console.error('Erro ao sincronizar com Supabase:', err);
+      return { success: false, count: syncedCount, error: err?.message || 'Erro desconhecido' };
+    }
+  };
+
   // Configurações
   const updateStoreInfo = async (info: Partial<StoreInfo>) => {
-    setStoreInfo((prev) => ({ ...prev, ...info }));
+    setStoreInfo((prev) => {
+      const updated = { ...prev, ...info };
+      supabase.from('megalanche_settings').upsert([{
+        id: 'default',
+        store_name: updated.name,
+        tagline: updated.tagline,
+        city: updated.city,
+        address: updated.address,
+        whatsapp_number: updated.whatsappNumber,
+        whatsapp_display: updated.whatsappDisplay,
+        pix_key: updated.pixKey,
+        instagram_handle: updated.instagramHandle,
+        instagram_url: updated.instagramUrl,
+        logo_image: updated.logoImage,
+        opening_hours: updated.openingHours,
+        admin_pin: updated.adminPin,
+      }]).then(() => {}).catch(() => {});
+      return updated;
+    });
   };
 
   const updateHeroInfo = async (info: Partial<HeroInfo>) => {
@@ -658,6 +820,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         updateHeroInfo,
         resetToDefaults,
         processImageFile,
+        syncAllToSupabase,
       }}
     >
       {children}

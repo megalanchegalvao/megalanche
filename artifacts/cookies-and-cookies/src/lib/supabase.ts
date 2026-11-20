@@ -6,18 +6,16 @@ export const SUPABASE_PUBLISHABLE_KEY =
 export const SUPABASE_KEY = SUPABASE_PUBLISHABLE_KEY;
 export const SUPABASE_ANON_KEY = SUPABASE_PUBLISHABLE_KEY;
 
-// URL configurável (salva no localStorage ou padrão)
-export const getSupabaseUrl = (): string => {
-  try {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('megalanche_supabase_url') : null;
-    if (saved && saved.startsWith('http')) return saved;
-  } catch {
-    // fallback
-  }
-  return 'https://ounrfythtkpuldvplhec.supabase.co';
-};
+// URL oficial do projeto Mega Lanche Galvão no Supabase
+export const SUPABASE_URL = 'https://ounrfythtkpuldvplhec.supabase.co';
 
-export const SUPABASE_URL = getSupabaseUrl();
+// Limpeza de chaves de URL legadas do localStorage para garantir conexão ao projeto correto
+try {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('megalanche_supabase_url');
+    localStorage.removeItem('megalanche_supabase_key');
+  }
+} catch {}
 
 // Fallback resiliente que simula a interface do Supabase para nunca quebrar a aplicação caso offline
 const mockQueryBuilder = {

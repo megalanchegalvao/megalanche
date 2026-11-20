@@ -28,6 +28,7 @@ import {
 import { useStore } from '../context/StoreContext';
 import { type Product, type Coupon, type PresentationOption, type CategoryItem } from '../data/menu';
 import { SUPABASE_SQL_SCHEMA } from '../lib/supabase';
+import { Cloud, RefreshCw } from 'lucide-react';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -63,6 +64,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
     updateStoreInfo,
     updateHeroInfo,
     processImageFile,
+    syncAllToSupabase,
   } = useStore();
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -71,6 +73,24 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [showPin, setShowPin] = useState(false);
   const [activeTab, setActiveTab] = useState<'products' | 'popular' | 'categories' | 'store' | 'hero' | 'coupons'>('products');
   const [toast, setToast] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncToCloud = async () => {
+    setIsSyncing(true);
+    showNotification('Sincronizando fotos e dados com a nuvem Supabase... ⏳');
+    try {
+      const res = await syncAllToSupabase();
+      if (res.success) {
+        showNotification(`Sucesso! ${res.count} produtos sincronizados na nuvem! ✅`);
+      } else {
+        showNotification(`Aviso na sincronização: ${res.error || 'Verifique sua conexão'}`);
+      }
+    } catch (e: any) {
+      showNotification(`Erro ao sincronizar: ${e?.message || e}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Busca dentro do admin
   const [adminSearch, setAdminSearch] = useState('');
@@ -453,6 +473,20 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
           {/* Botões de Ação do Topo */}
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSyncToCloud}
+              disabled={isSyncing}
+              title="Salva todas as fotos e produtos no Supabase para aparecer em todos os aparelhos"
+              className={`inline-flex items-center gap-2 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-xs transition-all active:scale-95 ${
+                isSyncing
+                  ? 'bg-amber-600 animate-pulse cursor-wait'
+                  : 'bg-emerald-600 hover:bg-emerald-700'
+              }`}
+            >
+              <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+              <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar com a Nuvem'}</span>
+            </button>
             <button
               onClick={onClose}
               className="inline-flex items-center gap-2 bg-stone-900 hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-xs transition-colors"
@@ -1253,6 +1287,19 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                 Para que as novas fotos e alterações apareçam em outros celulares, computadores e guias anônimas, o seu banco Supabase precisa estar com as tabelas criadas. Se ainda não executou, copie o código SQL abaixo e rode no SQL Editor do seu Supabase.
               </p>
               <div className="flex flex-wrap gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSyncToCloud}
+                  disabled={isSyncing}
+                  className={`text-white font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-sm transition-all active:scale-95 ${
+                    isSyncing
+                      ? 'bg-amber-600 animate-pulse cursor-wait'
+                      : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
+                >
+                  <RefreshCw size={15} className={isSyncing ? 'animate-spin' : ''} />
+                  <span>{isSyncing ? 'Sincronizando Tudo...' : 'Sincronizar Todas as Fotos e Dados para a Nuvem'}</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => {
