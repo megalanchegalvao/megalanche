@@ -122,7 +122,17 @@ div[id*="netlify-drawer"],
 .netlify-feedback-badge,
 [class*="netlify-drawer"],
 [data-feedback-button],
-#netlify-feedback {
+#netlify-feedback,
+/* Badge "Powered by Netlify" (plano gratuito) */
+[data-netlify-badge],
+.netlify-badge,
+#netlify-badge,
+a[href*="netlify.com"][target="_blank"],
+div[class*="Badge"],
+div[class*="badge"][style*="position: fixed"],
+div[style*="z-index: 2147483647"],
+iframe[title*="Netlify"],
+iframe[src*="netlify"] {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
