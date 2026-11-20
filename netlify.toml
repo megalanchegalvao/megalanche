@@ -1,5 +1,5 @@
 [build]
-  command = "pnpm --filter @workspace/cookies-and-cookies... run build"
+  command = "cd artifacts/cookies-and-cookies && npm install && npm run build"
   publish = "artifacts/cookies-and-cookies/dist/public"
 
 [[redirects]]
