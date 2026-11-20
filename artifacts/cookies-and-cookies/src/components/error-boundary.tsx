@@ -37,28 +37,38 @@ function toError(value: unknown): Error {
 
 function DefaultFallback({ error, resetError }: ErrorFallbackProps) {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 p-6">
-      <div className="max-w-lg w-full text-center">
-        <h1 className="text-xl font-semibold text-gray-900">
-          Something went wrong
+    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 p-6 font-sans">
+      <div className="max-w-lg w-full text-center bg-white p-8 rounded-3xl shadow-xl border border-stone-200">
+        <h1 className="text-xl font-black text-stone-900">
+          Ops, algo deu errado!
         </h1>
-        <p className="mt-2 text-sm text-gray-600">
-          This part of the app hit an error. The rest of the app is still
-          running.
+        <p className="mt-2 text-xs text-stone-600">
+          Ocorreu um erro ao carregar os dados. Você pode recarregar ou limpar os dados locais.
         </p>
-        {/* Dev only: messages can carry API responses and other internals. */}
-        {import.meta.env.DEV ? (
-          <pre className="mt-4 overflow-x-auto rounded bg-gray-100 p-3 text-left text-xs text-gray-800">
-            {error.message || String(error)}
-          </pre>
-        ) : null}
-        <button
-          type="button"
-          onClick={resetError}
-          className="mt-4 rounded bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700"
-        >
-          Try again
-        </button>
+        <div className="mt-4 overflow-x-auto rounded-xl bg-stone-100 p-3 text-left text-xs text-red-600 max-h-48 overflow-y-auto font-mono">
+          <p className="font-bold">{error?.message || String(error)}</p>
+        </div>
+        <div className="mt-5 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={resetError}
+            className="rounded-full bg-red-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-red-700 active:scale-95 transition-all shadow-xs"
+          >
+            Tentar Novamente
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                localStorage.clear();
+                window.location.reload();
+              } catch {}
+            }}
+            className="rounded-full bg-stone-200 px-5 py-2.5 text-xs font-bold text-stone-700 hover:bg-stone-300 active:scale-95 transition-all"
+          >
+            Limpar Cache Local
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ import {
   INITIAL_CATEGORIES,
   cleanProductImage,
   isGhostImage,
+  normalizeImages,
 } from '../data/menu';
 import { supabase, uploadProductImageToStorage, uploadBase64ImageToStorage } from '../lib/supabase';
 
@@ -94,14 +95,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map((prod) => {
             const cleanImg = cleanProductImage(prod.image);
-            const cleanImgs = (prod.images || []).map(cleanProductImage).filter(Boolean);
+            const cleanImgs = normalizeImages(prod.images);
             return {
               ...prod,
               image: cleanImg,
-              images: cleanImgs,
+              images: cleanImgs.length > 0 ? cleanImgs : (cleanImg ? [cleanImg] : []),
               options: (prod.options || []).map((opt) => ({
                 ...opt,
-                images: (opt.images || []).map(cleanProductImage).filter(Boolean),
+                images: normalizeImages(opt.images),
               })),
             };
           });
@@ -244,20 +245,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!prodErr && dbProducts && dbProducts.length > 0) {
           const mappedProducts: Product[] = dbProducts.map((p: any) => {
             const cleanImg = cleanProductImage(p.image);
-            const cleanImgs = (p.images || []).map(cleanProductImage).filter(Boolean);
+            const cleanImgs = normalizeImages(p.images);
             return {
               id: p.id,
-              name: p.name,
-              tagline: p.tagline,
-              description: p.description,
-              category: p.category,
+              name: p.name || '',
+              tagline: p.tagline || '',
+              description: p.description || '',
+              category: p.category || 'Lanches',
               image: cleanImg,
               images: cleanImgs.length > 0 ? cleanImgs : (cleanImg ? [cleanImg] : []),
-              available: p.available,
-              ingredientsBadge: p.ingredients_badge ?? p.ingredientsBadge,
+              available: p.available ?? true,
+              ingredientsBadge: p.ingredients_badge ?? p.ingredientsBadge ?? '',
               options: (p.options || []).map((o: any) => ({
                 ...o,
-                images: (o.images || []).map(cleanProductImage).filter(Boolean),
+                images: normalizeImages(o.images),
               })),
             };
           });
@@ -456,7 +457,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         description: newProduct.description,
         category: newProduct.category,
         image: cleanProductImage(newProduct.image),
-        images: (newProduct.images || []).map(cleanProductImage).filter(Boolean),
+        images: normalizeImages(newProduct.images),
         available: newProduct.available,
         ingredients_badge: newProduct.ingredientsBadge || '',
         options: newProduct.options || [],
@@ -479,7 +480,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } catch {}
     } else {
       finalProduct.image = cleanProductImage(finalProduct.image);
-      finalProduct.images = (finalProduct.images || []).map(cleanProductImage).filter(Boolean);
+      finalProduct.images = normalizeImages(finalProduct.images);
     }
 
     setProducts((prev) => prev.map((p) => (p.id === finalProduct.id ? finalProduct : p)));

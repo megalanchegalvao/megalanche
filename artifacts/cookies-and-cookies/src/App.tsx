@@ -107,15 +107,16 @@ function AppContent() {
   // Produtos filtrados por categoria e termo de busca
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
+      const cat = (p.category || 'Lanches').toLowerCase();
       const matchesCategory =
-        activeCategory === 'Todos' || p.category.toLowerCase() === activeCategory.toLowerCase();
+        activeCategory === 'Todos' || cat === activeCategory.toLowerCase();
       const query = searchQuery.trim().toLowerCase();
       const matchesSearch =
         !query ||
-        p.name.toLowerCase().includes(query) ||
-        p.tagline.toLowerCase().includes(query) ||
-        p.description.toLowerCase().includes(query) ||
-        p.category.toLowerCase().includes(query);
+        (p.name || '').toLowerCase().includes(query) ||
+        (p.tagline || '').toLowerCase().includes(query) ||
+        (p.description || '').toLowerCase().includes(query) ||
+        cat.includes(query);
       return matchesCategory && matchesSearch;
     });
   }, [products, activeCategory, searchQuery]);
@@ -435,13 +436,13 @@ function AppContent() {
             {/* Textos do Banner (A FLAG FOI REMOVIDA) */}
             <div className="md:col-span-7 space-y-3 z-10 text-center md:text-left">
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-stone-900 leading-tight font-display">
-                {heroInfo.title.includes('.') ? (
+                {(heroInfo?.title || '').includes('.') ? (
                   <>
-                    {heroInfo.title.split('.')[0]}. <br />
-                    <span className="text-red-600">{heroInfo.title.split('.').slice(1).join('.')}</span>
+                    {(heroInfo?.title || '').split('.')[0]}. <br />
+                    <span className="text-red-600">{(heroInfo?.title || '').split('.').slice(1).join('.')}</span>
                   </>
                 ) : (
-                  heroInfo.title
+                  heroInfo?.title || 'Feito na Hora. Feito para Você.'
                 )}
               </h1>
               <p className="text-xs sm:text-sm md:text-base text-stone-600 max-w-lg leading-relaxed font-medium mx-auto md:mx-0">

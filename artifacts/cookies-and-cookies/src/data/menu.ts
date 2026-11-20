@@ -57,9 +57,23 @@ export const isGhostImage = (url?: string): boolean => {
 };
 
 // Retorna apenas fotos legítimas adicionadas pelo administrador (Supabase Storage, base64 ou URL customizada válida)
-export const cleanProductImage = (url?: string): string => {
+export const cleanProductImage = (url?: unknown): string => {
+  if (!url || typeof url !== 'string') return '';
   if (isGhostImage(url)) return '';
-  return (url || '').trim();
+  return url.trim();
+};
+
+// Normaliza qualquer entrada de images (seja array, string única ou null) para um array de URLs válidas
+export const normalizeImages = (imgs?: unknown): string[] => {
+  if (!imgs) return [];
+  if (Array.isArray(imgs)) {
+    return imgs.map((img) => cleanProductImage(img)).filter(Boolean);
+  }
+  if (typeof imgs === 'string' && imgs.trim()) {
+    const clean = cleanProductImage(imgs);
+    return clean ? [clean] : [];
+  }
+  return [];
 };
 
 export const INITIAL_CATEGORIES: CategoryItem[] = [
