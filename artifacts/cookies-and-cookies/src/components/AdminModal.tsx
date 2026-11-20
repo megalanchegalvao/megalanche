@@ -1265,7 +1265,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                   <span>Copiar Código SQL do Supabase</span>
                 </button>
                 <a
-                  href="https://supabase.com/dashboard/project/uiytreumbuaguqvoiczz/sql/new"
+                  href="https://supabase.com/dashboard/project/ounrfythtkpuldvplhec/sql/new"
                   target="_blank"
                   rel="noreferrer"
                   className="bg-white hover:bg-stone-50 border border-amber-300 text-amber-900 font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-2xs transition-colors"

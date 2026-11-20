@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Chave pública (anon/publishable) do Supabase para o cliente frontend
 export const SUPABASE_PUBLISHABLE_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_cpUuM1nm2u5H2faqgrcNxQ_O6yMQ4az';
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_CfPbyPx_TzL61eD5QWXVjg_4Ql99gU-';
 export const SUPABASE_KEY = SUPABASE_PUBLISHABLE_KEY;
 export const SUPABASE_ANON_KEY = SUPABASE_PUBLISHABLE_KEY;
 
@@ -14,7 +14,7 @@ export const getSupabaseUrl = (): string => {
   } catch {
     // fallback
   }
-  return 'https://uiytreumbuaguqvoiczz.supabase.co';
+  return 'https://ounrfythtkpuldvplhec.supabase.co';
 };
 
 export const SUPABASE_URL = getSupabaseUrl();
