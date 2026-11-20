@@ -208,12 +208,12 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
       name: '',
       tagline: '',
       description: '',
-      category: categories[1]?.name || 'Lanches',
+      category: categories.find((c) => c.name !== 'Todos')?.name || 'Lanches',
       image: '/images/mega/logo-banner.jpg',
       available: true,
       ingredientsBadge: '',
       options: [
-        { id: 'opt-1', name: 'Individual', description: 'Porção individual', price: 25 },
+        { id: `opt-${Date.now()}`, name: 'Padrão', description: '', price: 25 },
       ],
     });
     setIsProductFormOpen(true);
@@ -222,14 +222,16 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const handleEditProduct = (prod: Product) => {
     setEditingProduct(prod);
     setProdForm({
-      name: prod.name,
-      tagline: prod.tagline,
-      description: prod.description,
-      category: prod.category,
-      image: prod.image,
-      available: prod.available,
+      name: prod.name || '',
+      tagline: prod.tagline || '',
+      description: prod.description || '',
+      category: prod.category || 'Lanches',
+      image: prod.image || '/images/mega/logo-banner.jpg',
+      available: prod.available ?? true,
       ingredientsBadge: prod.ingredientsBadge || '',
-      options: prod.options || [],
+      options: prod.options && prod.options.length > 0
+        ? prod.options
+        : [{ id: 'opt-padrao', name: prod.name || 'Padrão', description: '', price: 0 }],
     });
     setIsProductFormOpen(true);
   };
@@ -241,15 +243,31 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
       return;
     }
 
+    const currentPrice = prodForm.options[0]?.price ?? 0;
+    const baseOption: PresentationOption = {
+      ...(prodForm.options[0] || { id: 'opt-padrao', description: '' }),
+      name: prodForm.options[0]?.name || prodForm.name || 'Padrão',
+      price: currentPrice,
+    };
+    const finalOptions = [
+      baseOption,
+      ...(prodForm.options.slice(1)),
+    ];
+
+    const productPayload = {
+      ...prodForm,
+      options: finalOptions,
+    };
+
     if (editingProduct) {
       await updateProduct({
         ...editingProduct,
-        ...prodForm,
+        ...productPayload,
       });
-      showNotification('Produto atualizado com sucesso! ✅');
+      showNotification(`Produto "${prodForm.name}" atualizado! ✅`);
     } else {
-      await addProduct(prodForm);
-      showNotification('Novo produto criado com sucesso! ✅');
+      await addProduct(productPayload);
+      showNotification(`Novo produto "${prodForm.name}" criado! ✅`);
     }
     setIsProductFormOpen(false);
   };
@@ -473,182 +491,225 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
               </div>
             </div>
 
-            {/* Formulário de Produto Aberto */}
+            {/* Modal de Cadastro / Edição de Produto (Pop-up Centralizado com Backdrop) */}
             {isProductFormOpen && (
-              <div className="p-6 rounded-3xl bg-white border-2 border-red-500/80 shadow-lg space-y-5 text-xs">
-                <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-                  <h3 className="font-display font-black text-lg text-stone-900">
-                    {editingProduct ? `Editar: ${editingProduct.name}` : 'Cadastrar Novo Produto'}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setIsProductFormOpen(false)}
-                    className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-
-                <form onSubmit={handleSaveProduct} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="sm:col-span-2">
-                      <label className="font-bold text-stone-700 block mb-1">
-                        Nome do Produto *
-                      </label>
-                      <input
-                        type="text"
-                        value={prodForm.name}
-                        onChange={(e) => setProdForm({ ...prodForm, name: e.target.value })}
-                        className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs"
-                        placeholder="Ex: X-Mega Especial"
-                      />
-                    </div>
+              <div
+                className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs overflow-y-auto touch-manipulation animate-in fade-in duration-200"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setIsProductFormOpen(false);
+                }}
+              >
+                <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150">
+                  {/* Cabeçalho Fixo do Modal */}
+                  <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-b border-stone-200 shrink-0">
                     <div>
-                      <label className="font-bold text-stone-700 block mb-1">
-                        Categoria *
-                      </label>
-                      <select
-                        value={prodForm.category}
-                        onChange={(e) => setProdForm({ ...prodForm, category: e.target.value })}
-                        className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-medium"
-                      >
-                        {categories.filter((c) => c.name !== 'Todos').map((c) => (
-                          <option key={c.id} value={c.name}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-red-600 block">
+                        {editingProduct ? 'Editar Produto' : 'Cadastrar Item'}
+                      </span>
+                      <h3 className="font-display font-black text-lg text-stone-900 line-clamp-1">
+                        {editingProduct ? editingProduct.name : 'Novo Produto'}
+                      </h3>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="font-bold text-stone-700 block mb-1">
-                        Subtítulo / Tagline
-                      </label>
-                      <input
-                        type="text"
-                        value={prodForm.tagline}
-                        onChange={(e) => setProdForm({ ...prodForm, tagline: e.target.value })}
-                        className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs"
-                        placeholder="Ex: Muito queijo e bacon crocante"
-                      />
-                    </div>
-                    <div>
-                      <label className="font-bold text-stone-700 block mb-1">
-                        Selo de Destaque / Ingredientes
-                      </label>
-                      <input
-                        type="text"
-                        value={prodForm.ingredientsBadge}
-                        onChange={(e) => setProdForm({ ...prodForm, ingredientsBadge: e.target.value })}
-                        className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs"
-                        placeholder="Ex: Burger 160g • Bacon • Queijo"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-stone-700 block mb-1">
-                      Descrição Detalhada
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={prodForm.description}
-                      onChange={(e) => setProdForm({ ...prodForm, description: e.target.value })}
-                      className="w-full bg-stone-50 border border-stone-300 rounded-xl p-3 text-xs leading-relaxed"
-                      placeholder="Descreva o que vai no lanche, sabor e diferenciais..."
-                    />
-                  </div>
-
-                  {/* Foto do Produto com Upload do Computador */}
-                  <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
-                    <label className="font-bold text-stone-800 block text-xs">
-                      Foto do Produto (Upload ou Link)
-                    </label>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                      <div className="w-24 h-24 rounded-2xl bg-white border border-stone-200 overflow-hidden shrink-0">
-                        <img
-                          src={prodForm.image}
-                          alt="Prévia"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="flex-1 space-y-2 w-full">
-                        <input
-                          type="text"
-                          value={prodForm.image}
-                          onChange={(e) => setProdForm({ ...prodForm, image: e.target.value })}
-                          placeholder="Cole a URL da imagem ou carregue abaixo..."
-                          className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs"
-                        />
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="file"
-                            ref={productFileRef}
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleUploadProductImage(file);
-                            }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => productFileRef.current?.click()}
-                            className="bg-stone-900 hover:bg-black text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2"
-                          >
-                            <Upload size={14} />
-                            <span>Carregar Foto do Computador / Celular</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Preço Principal */}
-                  <div>
-                    <label className="font-bold text-stone-700 block mb-1">
-                      Preço Principal (R$) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.50"
-                      value={prodForm.options[0]?.price || 0}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setProdForm({
-                          ...prodForm,
-                          options: [
-                            {
-                              ...prodForm.options[0],
-                              id: prodForm.options[0]?.id || 'padrao',
-                              name: prodForm.options[0]?.name || 'Padrão',
-                              price: val,
-                            },
-                          ],
-                        });
-                      }}
-                      className="w-48 bg-white border border-stone-300 rounded-xl px-4 py-2.5 text-sm font-black text-stone-900"
-                    />
-                  </div>
-
-                  <div className="flex justify-end gap-3 pt-3 border-t border-stone-100">
                     <button
                       type="button"
                       onClick={() => setIsProductFormOpen(false)}
-                      className="px-5 py-2.5 rounded-full border border-stone-300 text-stone-600 font-bold hover:bg-stone-50"
+                      className="w-9 h-9 rounded-full bg-stone-200/80 hover:bg-stone-300 text-stone-700 flex items-center justify-center transition-colors shrink-0 active:scale-95"
+                      title="Fechar"
                     >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-8 py-2.5 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold shadow-md"
-                    >
-                      Salvar Produto
+                      <X size={18} />
                     </button>
                   </div>
-                </form>
+
+                  {/* Formulário com Scroll Próprio */}
+                  <form onSubmit={handleSaveProduct} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="sm:col-span-2">
+                        <label className="font-bold text-stone-700 block mb-1">
+                          Nome do Produto *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={prodForm.name}
+                          onChange={(e) => setProdForm({ ...prodForm, name: e.target.value })}
+                          className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-900 focus:outline-none focus:border-red-600"
+                          placeholder="Ex: X-Mega Especial"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-stone-700 block mb-1">
+                          Categoria *
+                        </label>
+                        <select
+                          value={prodForm.category}
+                          onChange={(e) => setProdForm({ ...prodForm, category: e.target.value })}
+                          className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-900 focus:outline-none focus:border-red-600"
+                        >
+                          {categories.filter((c) => c.name !== 'Todos').map((c) => (
+                            <option key={c.id} value={c.name}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="font-bold text-stone-700 block mb-1">
+                          Preço Principal (R$) *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500 font-bold text-xs">
+                            R$
+                          </span>
+                          <input
+                            type="number"
+                            step="0.50"
+                            min="0"
+                            required
+                            value={prodForm.options[0]?.price ?? 0}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              const currentOptions = prodForm.options && prodForm.options.length > 0 ? prodForm.options : [{ id: 'padrao', name: prodForm.name || 'Padrão', price: 0 }];
+                              setProdForm({
+                                ...prodForm,
+                                options: [
+                                  {
+                                    ...currentOptions[0],
+                                    price: val,
+                                  },
+                                  ...currentOptions.slice(1),
+                                ],
+                              });
+                            }}
+                            className="w-full bg-stone-50 border border-stone-300 rounded-xl pl-9 pr-4 py-2.5 text-sm font-black text-stone-900 focus:outline-none focus:border-red-600"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-stone-700 block mb-1">
+                          Disponibilidade no Cardápio
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setProdForm({ ...prodForm, available: !prodForm.available })}
+                          className={`w-full py-2.5 px-3.5 rounded-xl border flex items-center justify-between font-bold text-xs transition-colors ${
+                            prodForm.available
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                              : 'bg-red-50 border-red-300 text-red-800'
+                          }`}
+                        >
+                          <span>{prodForm.available ? '🟢 Disponível para Pedidos' : '🔴 Esgotado no Momento'}</span>
+                          <span className="text-[10px] underline">Alternar</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="font-bold text-stone-700 block mb-1">
+                          Subtítulo / Tagline
+                        </label>
+                        <input
+                          type="text"
+                          value={prodForm.tagline}
+                          onChange={(e) => setProdForm({ ...prodForm, tagline: e.target.value })}
+                          className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs"
+                          placeholder="Ex: Muito queijo e bacon crocante"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-stone-700 block mb-1">
+                          Selo de Destaque / Ingredientes
+                        </label>
+                        <input
+                          type="text"
+                          value={prodForm.ingredientsBadge}
+                          onChange={(e) => setProdForm({ ...prodForm, ingredientsBadge: e.target.value })}
+                          className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs"
+                          placeholder="Ex: Burger 160g • Bacon • Queijo"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-stone-700 block mb-1">
+                        Descrição Detalhada
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={prodForm.description}
+                        onChange={(e) => setProdForm({ ...prodForm, description: e.target.value })}
+                        className="w-full bg-stone-50 border border-stone-300 rounded-xl p-3 text-xs leading-relaxed focus:outline-none focus:border-red-600"
+                        placeholder="Descreva os ingredientes, acompanhamentos e sabor..."
+                      />
+                    </div>
+
+                    {/* Foto do Produto com Upload do Computador / Celular */}
+                    <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
+                      <label className="font-bold text-stone-800 block text-xs">
+                        Foto do Produto (Upload ou Link)
+                      </label>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                        <div className="w-24 h-24 rounded-2xl bg-white border border-stone-200 overflow-hidden shrink-0 shadow-xs">
+                          <img
+                            src={prodForm.image}
+                            alt="Prévia"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 space-y-2 w-full">
+                          <input
+                            type="text"
+                            value={prodForm.image}
+                            onChange={(e) => setProdForm({ ...prodForm, image: e.target.value })}
+                            placeholder="Cole a URL da imagem ou envie abaixo..."
+                            className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs"
+                          />
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="file"
+                              ref={productFileRef}
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleUploadProductImage(file);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => productFileRef.current?.click()}
+                              className="w-full sm:w-auto bg-stone-900 hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-transform"
+                            >
+                              <Upload size={14} />
+                              <span>Carregar Foto do Celular / PC</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Botões do Rodapé */}
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-stone-100">
+                      <button
+                        type="button"
+                        onClick={() => setIsProductFormOpen(false)}
+                        className="px-5 py-2.5 rounded-full border border-stone-300 text-stone-600 font-bold hover:bg-stone-50 active:scale-95 transition-transform"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-8 py-2.5 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold shadow-md active:scale-95 transition-transform"
+                      >
+                        Salvar Alterações
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
             )}
 
@@ -657,22 +718,31 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
               {filteredAdminProducts.map((p) => (
                 <div
                   key={p.id}
-                  className="p-4 rounded-3xl bg-white border border-stone-200/80 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-red-200 transition-all"
+                  className="p-4 rounded-3xl bg-white border border-stone-200/80 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-red-200 transition-all group"
                 >
-                  <div>
+                  <div
+                    onClick={() => handleEditProduct(p)}
+                    className="cursor-pointer"
+                    title="Clique para editar este item"
+                  >
                     <div className="w-full h-36 rounded-2xl overflow-hidden bg-stone-100 mb-3 relative">
                       <img
                         src={p.image}
                         alt={p.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
-                      <span className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
+                      <span className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-xs">
                         {p.category}
                       </span>
+                      {!p.available && (
+                        <span className="absolute top-2 right-2 bg-stone-900/90 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-xs">
+                          Esgotado
+                        </span>
+                      )}
                     </div>
 
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-sm text-stone-900 line-clamp-1">
+                      <h4 className="font-extrabold text-sm text-stone-900 line-clamp-1 group-hover:text-red-600 transition-colors">
                         {p.name}
                       </h4>
                       <p className="text-[11px] text-stone-500 line-clamp-2 leading-relaxed">
@@ -685,25 +755,28 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                     <span className="font-black text-base text-stone-900 font-display">
                       {formatBRL(p.options[0]?.price || 0)}
                     </span>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                       <button
+                        type="button"
                         onClick={() => handleEditProduct(p)}
-                        className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition-colors"
-                        title="Editar"
+                        className="h-9 px-3.5 rounded-full bg-stone-900 hover:bg-black text-white flex items-center gap-1.5 text-xs font-bold shadow-xs active:scale-95 transition-all touch-manipulation"
+                        title="Editar produto"
                       >
-                        <Edit2 size={14} />
+                        <Edit2 size={13} />
+                        <span>Editar</span>
                       </button>
                       <button
+                        type="button"
                         onClick={() => {
                           if (confirm(`Excluir o produto "${p.name}"?`)) {
                             deleteProduct(p.id);
                             showNotification('Produto removido.');
                           }
                         }}
-                        className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center transition-colors"
+                        className="w-9 h-9 rounded-full bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center transition-colors active:scale-95 touch-manipulation"
                         title="Excluir"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </div>
@@ -740,94 +813,118 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
               </button>
             </div>
 
-            {/* Formulário de Categoria Aberto */}
+            {/* Modal de Categoria (Pop-up Centralizado com Backdrop) */}
             {isCategoryFormOpen && (
-              <div className="p-6 rounded-3xl bg-white border-2 border-red-500 shadow-md space-y-4 text-xs">
-                <h3 className="font-bold text-sm text-stone-900">
-                  {editingCategory ? `Editar: ${editingCategory.name}` : 'Criar Nova Categoria'}
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="font-bold text-stone-700 block mb-1">
-                      Nome da Categoria
-                    </label>
-                    <input
-                      type="text"
-                      value={categoryForm.name}
-                      onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                      placeholder="Ex: Sobremesas & Milk-shakes"
-                      className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-bold text-stone-700 block mb-1">
-                      Link / URL da Imagem
-                    </label>
-                    <input
-                      type="text"
-                      value={categoryForm.icon}
-                      onChange={(e) => setCategoryForm({ ...categoryForm, icon: e.target.value })}
-                      placeholder="URL da foto circular..."
-                      className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 pt-2">
-                  <div className="w-16 h-16 rounded-full p-1 ring-3 ring-red-600 bg-white overflow-hidden shrink-0">
-                    <img
-                      src={categoryForm.icon}
-                      alt="Prévia"
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  </div>
-                  <div>
-                    <input
-                      type="file"
-                      ref={categoryFileRef}
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleUploadCategoryImage(file);
-                      }}
-                    />
+              <div
+                className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs overflow-y-auto touch-manipulation animate-in fade-in duration-200"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setIsCategoryFormOpen(false);
+                }}
+              >
+                <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-b border-stone-200 shrink-0">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-red-600 block">
+                        {editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
+                      </span>
+                      <h3 className="font-bold text-sm text-stone-900">
+                        {editingCategory ? `Editar: ${editingCategory.name}` : 'Criar Nova Categoria'}
+                      </h3>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => categoryFileRef.current?.click()}
-                      className="bg-stone-900 hover:bg-black text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2"
+                      onClick={() => setIsCategoryFormOpen(false)}
+                      className="w-9 h-9 rounded-full bg-stone-200/80 hover:bg-stone-300 text-stone-700 flex items-center justify-center transition-colors shrink-0 active:scale-95"
                     >
-                      <Upload size={14} />
-                      <span>Escolher Foto do Computador / Celular</span>
+                      <X size={18} />
                     </button>
                   </div>
-                </div>
 
-                <div className="flex justify-end gap-3 pt-3 border-t border-stone-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsCategoryFormOpen(false)}
-                    className="px-5 py-2 rounded-full border border-stone-300 text-stone-600 font-bold"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!categoryForm.name.trim()) return;
-                      if (editingCategory) {
-                        await updateCategory({ ...editingCategory, ...categoryForm });
-                        showNotification('Categoria atualizada! ✅');
-                      } else {
-                        await addCategory(categoryForm);
-                        showNotification('Categoria adicionada! ✅');
-                      }
-                      setIsCategoryFormOpen(false);
-                    }}
-                    className="px-6 py-2 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold"
-                  >
-                    Salvar Categoria
-                  </button>
+                  <div className="p-6 space-y-4 text-xs overflow-y-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="font-bold text-stone-700 block mb-1">
+                          Nome da Categoria
+                        </label>
+                        <input
+                          type="text"
+                          value={categoryForm.name}
+                          onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                          placeholder="Ex: Sobremesas & Milk-shakes"
+                          className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-red-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-stone-700 block mb-1">
+                          Link / URL da Imagem
+                        </label>
+                        <input
+                          type="text"
+                          value={categoryForm.icon}
+                          onChange={(e) => setCategoryForm({ ...categoryForm, icon: e.target.value })}
+                          placeholder="URL da foto circular..."
+                          className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-red-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 pt-2">
+                      <div className="w-16 h-16 rounded-full p-1 ring-3 ring-red-600 bg-white overflow-hidden shrink-0 shadow-xs">
+                        <img
+                          src={categoryForm.icon}
+                          alt="Prévia"
+                          className="w-full h-full object-cover rounded-full"
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="file"
+                          ref={categoryFileRef}
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadCategoryImage(file);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => categoryFileRef.current?.click()}
+                          className="bg-stone-900 hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 active:scale-95 transition-transform"
+                        >
+                          <Upload size={14} />
+                          <span>Escolher Foto do Celular / PC</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-3 border-t border-stone-100">
+                      <button
+                        type="button"
+                        onClick={() => setIsCategoryFormOpen(false)}
+                        className="px-5 py-2.5 rounded-full border border-stone-300 text-stone-600 font-bold active:scale-95 transition-transform"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!categoryForm.name.trim()) return;
+                          if (editingCategory) {
+                            await updateCategory({ ...editingCategory, ...categoryForm });
+                            showNotification('Categoria atualizada! ✅');
+                          } else {
+                            await addCategory(categoryForm);
+                            showNotification('Categoria adicionada! ✅');
+                          }
+                          setIsCategoryFormOpen(false);
+                        }}
+                        className="px-6 py-2.5 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold active:scale-95 transition-transform shadow-md"
+                      >
+                        Salvar Categoria
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1225,102 +1322,127 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
               </button>
             </div>
 
+            {/* Modal de Cupom (Pop-up Centralizado com Backdrop) */}
             {isCouponFormOpen && (
-              <div className="p-6 rounded-3xl bg-white border-2 border-red-500 shadow-md space-y-4 text-xs">
-                <h3 className="font-bold text-sm text-stone-900">
-                  {editingCoupon ? 'Editar Cupom' : 'Criar Novo Cupom'}
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="font-bold text-stone-700 block mb-1">
-                      Código do Cupom
-                    </label>
-                    <input
-                      type="text"
-                      value={couponForm.code}
-                      onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
-                      placeholder="Ex: MEGA10"
-                      className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs uppercase font-mono font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-bold text-stone-700 block mb-1">
-                      Tipo de Desconto
-                    </label>
-                    <select
-                      value={couponForm.type}
-                      onChange={(e) => setCouponForm({ ...couponForm, type: e.target.value as any })}
-                      className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-medium"
+              <div
+                className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs overflow-y-auto touch-manipulation animate-in fade-in duration-200"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setIsCouponFormOpen(false);
+                }}
+              >
+                <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between px-6 py-4 bg-stone-50 border-b border-stone-200 shrink-0">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-red-600 block">
+                        {editingCoupon ? 'Editar Cupom' : 'Novo Cupom'}
+                      </span>
+                      <h3 className="font-bold text-sm text-stone-900">
+                        {editingCoupon ? 'Editar Cupom' : 'Criar Novo Cupom'}
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsCouponFormOpen(false)}
+                      className="w-9 h-9 rounded-full bg-stone-200/80 hover:bg-stone-300 text-stone-700 flex items-center justify-center transition-colors shrink-0 active:scale-95"
                     >
-                      <option value="percentage">Porcentagem (%)</option>
-                      <option value="fixed">Valor Fixo (R$)</option>
-                    </select>
+                      <X size={18} />
+                    </button>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="font-bold text-stone-700 block mb-1">
-                      Valor do Desconto {couponForm.type === 'percentage' ? '(%)' : '(R$)'}
-                    </label>
-                    <input
-                      type="number"
-                      value={couponForm.value}
-                      onChange={(e) => setCouponForm({ ...couponForm, value: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-bold"
-                    />
+                  <div className="p-6 space-y-4 text-xs overflow-y-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="font-bold text-stone-700 block mb-1">
+                          Código do Cupom
+                        </label>
+                        <input
+                          type="text"
+                          value={couponForm.code}
+                          onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
+                          placeholder="Ex: MEGA10"
+                          className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs uppercase font-mono font-bold focus:outline-none focus:border-red-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-stone-700 block mb-1">
+                          Tipo de Desconto
+                        </label>
+                        <select
+                          value={couponForm.type}
+                          onChange={(e) => setCouponForm({ ...couponForm, type: e.target.value as any })}
+                          className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-red-600"
+                        >
+                          <option value="percentage">Porcentagem (%)</option>
+                          <option value="fixed">Valor Fixo (R$)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="font-bold text-stone-700 block mb-1">
+                          Valor do Desconto {couponForm.type === 'percentage' ? '(%)' : '(R$)'}
+                        </label>
+                        <input
+                          type="number"
+                          value={couponForm.value}
+                          onChange={(e) => setCouponForm({ ...couponForm, value: parseFloat(e.target.value) || 0 })}
+                          className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:border-red-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-stone-700 block mb-1">
+                          Valor Mínimo do Pedido (R$)
+                        </label>
+                        <input
+                          type="number"
+                          value={couponForm.minOrderValue}
+                          onChange={(e) => setCouponForm({ ...couponForm, minOrderValue: parseFloat(e.target.value) || 0 })}
+                          className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:border-red-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-stone-700 block mb-1">
+                        Descrição do Cupom
+                      </label>
+                      <input
+                        type="text"
+                        value={couponForm.description}
+                        onChange={(e) => setCouponForm({ ...couponForm, description: e.target.value })}
+                        placeholder="Ex: 10% de desconto no seu pedido!"
+                        className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-red-600"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-3 border-t border-stone-100">
+                      <button
+                        type="button"
+                        onClick={() => setIsCouponFormOpen(false)}
+                        className="px-5 py-2.5 rounded-full border border-stone-300 text-stone-600 font-bold active:scale-95 transition-transform"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!couponForm.code.trim()) return;
+                          if (editingCoupon) {
+                            await updateCoupon({ ...editingCoupon, ...couponForm });
+                            showNotification('Cupom atualizado! ✅');
+                          } else {
+                            await addCoupon(couponForm);
+                            showNotification('Cupom adicionado! ✅');
+                          }
+                          setIsCouponFormOpen(false);
+                        }}
+                        className="px-6 py-2.5 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold active:scale-95 transition-transform shadow-md"
+                      >
+                        Salvar Cupom
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="font-bold text-stone-700 block mb-1">
-                      Valor Mínimo do Pedido (R$)
-                    </label>
-                    <input
-                      type="number"
-                      value={couponForm.minOrderValue}
-                      onChange={(e) => setCouponForm({ ...couponForm, minOrderValue: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="font-bold text-stone-700 block mb-1">
-                    Descrição do Cupom
-                  </label>
-                  <input
-                    type="text"
-                    value={couponForm.description}
-                    onChange={(e) => setCouponForm({ ...couponForm, description: e.target.value })}
-                    placeholder="Ex: 10% de desconto no seu pedido!"
-                    className="w-full bg-stone-50 border border-stone-300 rounded-xl px-3.5 py-2.5 text-xs"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3 pt-3 border-t border-stone-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsCouponFormOpen(false)}
-                    className="px-5 py-2 rounded-full border border-stone-300 text-stone-600 font-bold"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!couponForm.code.trim()) return;
-                      if (editingCoupon) {
-                        await updateCoupon({ ...editingCoupon, ...couponForm });
-                        showNotification('Cupom atualizado! ✅');
-                      } else {
-                        await addCoupon(couponForm);
-                        showNotification('Cupom adicionado! ✅');
-                      }
-                      setIsCouponFormOpen(false);
-                    }}
-                    className="px-6 py-2 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold"
-                  >
-                    Salvar Cupom
-                  </button>
                 </div>
               </div>
             )}
