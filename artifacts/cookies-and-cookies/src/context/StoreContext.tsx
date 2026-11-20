@@ -11,6 +11,8 @@ import {
   INITIAL_STORE_INFO,
   INITIAL_HERO,
   INITIAL_CATEGORIES,
+  cleanProductImage,
+  isGhostImage,
 } from '../data/menu';
 import { supabase, uploadProductImageToStorage, uploadBase64ImageToStorage } from '../lib/supabase';
 
@@ -60,15 +62,15 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  PRODUCTS: 'megalanche_galvao_products_v5',
+  PRODUCTS: 'megalanche_galvao_products_v6',
   POPULAR_IDS: 'megalanche_galvao_popular_ids_v1',
-  COUPONS: 'megalanche_galvao_coupons_v5',
+  COUPONS: 'megalanche_galvao_coupons_v6',
   STORE_INFO: 'megalanche_galvao_store_info_v6',
-  HERO_INFO: 'megalanche_galvao_hero_info_v5',
-  CATEGORIES: 'megalanche_galvao_categories_v5',
+  HERO_INFO: 'megalanche_galvao_hero_info_v6',
+  CATEGORIES: 'megalanche_galvao_categories_v6',
 };
 
-// Limpeza de chaves antigas que continham "charneski" ou versões anteriores
+// Limpeza de chaves antigas que continham fotos mock / enraizadas ou versões anteriores
 try {
   [
     'charneski_products_v2',
@@ -77,6 +79,9 @@ try {
     'charneski_hero_info_v2',
     'megalanche_galvao_products_v1',
     'megalanche_galvao_products_v3',
+    'megalanche_galvao_products_v5',
+    'megalanche_galvao_hero_info_v5',
+    'megalanche_galvao_categories_v5',
   ].forEach((k) => localStorage.removeItem(k));
 } catch {}
 
@@ -86,20 +91,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
       if (saved) {
         const parsed: Product[] = JSON.parse(saved);
-        if (
-          Array.isArray(parsed) &&
-          parsed.length > 0 &&
-          !parsed.some((p) => p.category?.toLowerCase().includes('palha') || p.id.includes('palha'))
-        ) {
-          return parsed.map((prod) => ({
-            ...prod,
-            options: (prod.options || []).map((opt) => {
-              if (!opt.images || opt.images.length === 0) {
-                return { ...opt, images: [prod.image] };
-              }
-              return opt;
-            }),
-          }));
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((prod) => {
+            const cleanImg = cleanProductImage(prod.image);
+            const cleanImgs = (prod.images || []).map(cleanProductImage).filter(Boolean);
+            return {
+              ...prod,
+              image: cleanImg,
+              images: cleanImgs,
+              options: (prod.options || []).map((opt) => ({
+                ...opt,
+                images: (opt.images || []).map(cleanProductImage).filter(Boolean),
+              })),
+            };
+          });
         }
       }
       return INITIAL_PRODUCTS;
@@ -236,99 +241,75 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     async function loadFromSupabase() {
       try {
         const { data: dbProducts, error: prodErr } = await supabase.from('megalanche_products').select('*');
-        if (!prodErr && dbProducts) {
-          if (dbProducts.length > 0) {
-            const mappedProducts: Product[] = dbProducts.map((p: any) => ({
+        if (!prodErr && dbProducts && dbProducts.length > 0) {
+          const mappedProducts: Product[] = dbProducts.map((p: any) => {
+            const cleanImg = cleanProductImage(p.image);
+            const cleanImgs = (p.images || []).map(cleanProductImage).filter(Boolean);
+            return {
               id: p.id,
               name: p.name,
               tagline: p.tagline,
               description: p.description,
               category: p.category,
-              image: p.image,
-              images: p.images,
+              image: cleanImg,
+              images: cleanImgs.length > 0 ? cleanImgs : (cleanImg ? [cleanImg] : []),
               available: p.available,
               ingredientsBadge: p.ingredients_badge ?? p.ingredientsBadge,
-              options: p.options || [],
-            }));
+              options: (p.options || []).map((o: any) => ({
+                ...o,
+                images: (o.images || []).map(cleanProductImage).filter(Boolean),
+              })),
+            };
+          });
 
-            // Mescla com produtos da memória para nunca perder itens
-            setProducts((prev) => {
-              const base = prev && prev.length > 0 ? prev : INITIAL_PRODUCTS;
-              const merged = base.map((p) => {
-                const found = mappedProducts.find((dbP) => dbP.id === p.id);
-                if (!found) return p;
-                // Se o produto local do usuário possui foto modificada (ex: base64), não deixa sobrescrever
-                if (p.image && p.image.startsWith('data:image/')) {
-                  return { ...found, ...p, image: p.image };
-                }
-                return { ...p, ...found };
-              });
-              const additions = mappedProducts.filter((dbP) => !base.some((p) => p.id === dbP.id));
-              const finalList = [...merged, ...additions];
-
-              // Envia qualquer foto base64 pendente em segundo plano para o Supabase Storage
-              setTimeout(async () => {
-                for (const item of finalList) {
-                  if (item.image && item.image.startsWith('data:image/')) {
-                    try {
-                      const cloudUrl = await uploadBase64ImageToStorage(item.image);
-                      if (cloudUrl) {
-                        item.image = cloudUrl;
-                        await supabase.from('megalanche_products').upsert([{
-                          id: item.id,
-                          name: item.name,
-                          tagline: item.tagline,
-                          description: item.description,
-                          category: item.category,
-                          image: cloudUrl,
-                          images: item.images || [],
-                          available: item.available,
-                          ingredients_badge: item.ingredientsBadge || '',
-                          options: (item.options || []).map((o) => ({ ...o, images: [cloudUrl] })),
-                        }]);
-                        setProducts((curr) =>
-                          curr.map((cp) => (cp.id === item.id ? { ...cp, image: cloudUrl } : cp))
-                        );
-                      }
-                    } catch (e) {
-                      console.warn('Erro ao subir imagem pendente:', e);
-                    }
-                  }
-                }
-              }, 200);
-
-              return finalList;
+          // Atualiza lista garantindo que fotos legítimas do Supabase prevaleçam
+          setProducts((prev) => {
+            const base = prev && prev.length > 0 ? prev : INITIAL_PRODUCTS;
+            const merged = base.map((p) => {
+              const found = mappedProducts.find((dbP) => dbP.id === p.id);
+              if (!found) return p;
+              // Se o produto local do usuário possui foto modificada recém colocada (data:image), preserva
+              if (p.image && p.image.startsWith('data:image/')) {
+                return { ...found, ...p, image: p.image };
+              }
+              return { ...p, ...found };
             });
-          } else {
-            // Se o banco foi criado agora mas está vazio, tenta migrar o cardápio que o usuário já editou localmente
-            try {
-              const localSaved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-              const prodsToSync: Product[] = localSaved ? JSON.parse(localSaved) : INITIAL_PRODUCTS;
-              if (Array.isArray(prodsToSync) && prodsToSync.length > 0) {
-                for (const prod of prodsToSync) {
-                  let finalImg = prod.image;
-                  if (finalImg && finalImg.startsWith('data:image/')) {
-                    const uploaded = await uploadBase64ImageToStorage(finalImg);
-                    if (uploaded) finalImg = uploaded;
+            const additions = mappedProducts.filter((dbP) => !base.some((p) => p.id === dbP.id));
+            const finalList = [...merged, ...additions];
+
+            // Envia qualquer foto base64 pendente em segundo plano para o Supabase Storage
+            setTimeout(async () => {
+              for (const item of finalList) {
+                if (item.image && item.image.startsWith('data:image/')) {
+                  try {
+                    const cloudUrl = await uploadBase64ImageToStorage(item.image);
+                    if (cloudUrl) {
+                      item.image = cloudUrl;
+                      await supabase.from('megalanche_products').upsert([{
+                        id: item.id,
+                        name: item.name,
+                        tagline: item.tagline,
+                        description: item.description,
+                        category: item.category,
+                        image: cloudUrl,
+                        images: [cloudUrl],
+                        available: item.available,
+                        ingredients_badge: item.ingredientsBadge || '',
+                        options: (item.options || []).map((o) => ({ ...o, images: [cloudUrl] })),
+                      }]);
+                      setProducts((curr) =>
+                        curr.map((cp) => (cp.id === item.id ? { ...cp, image: cloudUrl } : cp))
+                      );
+                    }
+                  } catch (e) {
+                    console.warn('Erro ao subir imagem pendente:', e);
                   }
-                  await supabase.from('megalanche_products').upsert([{
-                    id: prod.id,
-                    name: prod.name,
-                    tagline: prod.tagline,
-                    description: prod.description,
-                    category: prod.category,
-                    image: finalImg,
-                    images: prod.images || [],
-                    available: prod.available,
-                    ingredients_badge: prod.ingredientsBadge || '',
-                    options: prod.options || [],
-                  }]);
                 }
               }
-            } catch (seedErr) {
-              console.warn('Erro ao sincronizar produtos locais:', seedErr);
-            }
-          }
+            }, 300);
+
+            return finalList;
+          });
         }
 
         const { data: dbCoupons, error: coupErr } = await supabase.from('megalanche_coupons').select('*');
@@ -361,6 +342,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             logoImage: dbSettings.logo_image || prev.logoImage,
             openingHours: dbSettings.opening_hours || prev.openingHours,
             adminPin: dbSettings.admin_pin || prev.adminPin,
+          }));
+
+          // Carrega as configurações do Banner Principal e Secundário da nuvem
+          setHeroInfo((prev) => ({
+            ...prev,
+            title: dbSettings.hero_title || prev.title,
+            subtitle: dbSettings.hero_subtitle || prev.subtitle,
+            badge: dbSettings.hero_badge ?? prev.badge,
+            image: dbSettings.hero_image || prev.image,
+            promoBannerTag: dbSettings.promo_banner_tag || prev.promoBannerTag,
+            promoBannerTitle: dbSettings.promo_banner_title || prev.promoBannerTitle,
+            promoBannerSubtitle: dbSettings.promo_banner_subtitle || prev.promoBannerSubtitle,
+            promoBannerButton: dbSettings.promo_banner_button || prev.promoBannerButton,
           }));
         }
       } catch (err) {
@@ -461,8 +455,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         tagline: newProduct.tagline,
         description: newProduct.description,
         category: newProduct.category,
-        image: newProduct.image,
-        images: newProduct.images || [],
+        image: cleanProductImage(newProduct.image),
+        images: (newProduct.images || []).map(cleanProductImage).filter(Boolean),
         available: newProduct.available,
         ingredients_badge: newProduct.ingredientsBadge || '',
         options: newProduct.options || [],
@@ -480,8 +474,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const cloudUrl = await uploadBase64ImageToStorage(finalProduct.image);
         if (cloudUrl) {
           finalProduct.image = cloudUrl;
+          finalProduct.images = [cloudUrl];
         }
       } catch {}
+    } else {
+      finalProduct.image = cleanProductImage(finalProduct.image);
+      finalProduct.images = (finalProduct.images || []).map(cleanProductImage).filter(Boolean);
     }
 
     setProducts((prev) => prev.map((p) => (p.id === finalProduct.id ? finalProduct : p)));
@@ -662,11 +660,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   };
 
-  // Sincronizar TUDO para o Supabase (produtos, cupons, settings)
+  // Sincronizar TUDO para o Supabase (produtos, cupons, configurações e banner)
   const syncAllToSupabase = async (): Promise<{ success: boolean; count: number; error?: string }> => {
     let syncedCount = 0;
     try {
-      // 1. Sincronizar todos os produtos
+      // 1. Sincronizar todos os produtos (apenas fotos reais)
       for (const prod of products) {
         let finalImage = prod.image;
 
@@ -676,14 +674,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             const cloudUrl = await uploadBase64ImageToStorage(finalImage);
             if (cloudUrl) {
               finalImage = cloudUrl;
-              // Atualiza o estado local também
               setProducts((prev) =>
-                prev.map((p) => (p.id === prod.id ? { ...p, image: cloudUrl } : p))
+                prev.map((p) => (p.id === prod.id ? { ...p, image: cloudUrl, images: [cloudUrl] } : p))
               );
             }
           } catch (imgErr) {
             console.warn('Erro ao subir imagem do produto', prod.id, imgErr);
           }
+        } else {
+          finalImage = cleanProductImage(finalImage);
         }
 
         // Faz upsert do produto no Supabase
@@ -694,12 +693,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           description: prod.description,
           category: prod.category,
           image: finalImage,
-          images: prod.images || [],
+          images: finalImage ? [finalImage] : [],
           available: prod.available,
           ingredients_badge: prod.ingredientsBadge || '',
           options: (prod.options || []).map((o) => ({
             ...o,
-            images: finalImage && finalImage.startsWith('http') ? [finalImage] : (o.images || []),
+            images: finalImage ? [finalImage] : [],
           })),
         };
 
@@ -724,7 +723,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }]);
       }
 
-      // 3. Sincronizar configurações da loja
+      // 3. Sincronizar configurações da loja e Banner Principal
+      let finalHeroImage = heroInfo.image;
+      if (finalHeroImage && finalHeroImage.startsWith('data:image/')) {
+        try {
+          const cloudHero = await uploadBase64ImageToStorage(finalHeroImage);
+          if (cloudHero) {
+            finalHeroImage = cloudHero;
+            setHeroInfo((prev) => ({ ...prev, image: cloudHero }));
+          }
+        } catch {}
+      }
+
+      let finalLogoImage = storeInfo.logoImage;
+      if (finalLogoImage && finalLogoImage.startsWith('data:image/')) {
+        try {
+          const cloudLogo = await uploadBase64ImageToStorage(finalLogoImage);
+          if (cloudLogo) {
+            finalLogoImage = cloudLogo;
+            setStoreInfo((prev) => ({ ...prev, logoImage: cloudLogo }));
+          }
+        } catch {}
+      }
+
       await supabase.from('megalanche_settings').upsert([{
         id: 'default',
         store_name: storeInfo.name,
@@ -736,9 +757,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         pix_key: storeInfo.pixKey,
         instagram_handle: storeInfo.instagramHandle,
         instagram_url: storeInfo.instagramUrl,
-        logo_image: storeInfo.logoImage,
+        logo_image: finalLogoImage,
         opening_hours: storeInfo.openingHours,
         admin_pin: storeInfo.adminPin,
+        hero_title: heroInfo.title,
+        hero_subtitle: heroInfo.subtitle,
+        hero_badge: heroInfo.badge,
+        hero_image: finalHeroImage,
+        promo_banner_tag: heroInfo.promoBannerTag,
+        promo_banner_title: heroInfo.promoBannerTitle,
+        promo_banner_subtitle: heroInfo.promoBannerSubtitle,
+        promo_banner_button: heroInfo.promoBannerButton,
       }]);
 
       return { success: true, count: syncedCount };
@@ -748,10 +777,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Configurações
+  // Configurações da Loja
   const updateStoreInfo = async (info: Partial<StoreInfo>) => {
+    let finalLogo = info.logoImage;
+    if (finalLogo && finalLogo.startsWith('data:image/')) {
+      try {
+        const cloudUrl = await uploadBase64ImageToStorage(finalLogo);
+        if (cloudUrl) {
+          finalLogo = cloudUrl;
+        }
+      } catch {}
+    }
+
     setStoreInfo((prev) => {
-      const updated = { ...prev, ...info };
+      const updated = { ...prev, ...info, ...(finalLogo ? { logoImage: finalLogo } : {}) };
       supabase.from('megalanche_settings').upsert([{
         id: 'default',
         store_name: updated.name,
@@ -771,8 +810,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  // Configurações do Hero / Banner Principal
   const updateHeroInfo = async (info: Partial<HeroInfo>) => {
-    setHeroInfo((prev) => ({ ...prev, ...info }));
+    let finalHero = { ...heroInfo, ...info };
+
+    // Se houver imagem base64, faz upload para o Supabase Storage
+    if (finalHero.image && finalHero.image.startsWith('data:image/')) {
+      try {
+        const cloudUrl = await uploadBase64ImageToStorage(finalHero.image);
+        if (cloudUrl) {
+          finalHero.image = cloudUrl;
+        }
+      } catch (e) {
+        console.warn('Erro ao subir imagem do hero:', e);
+      }
+    }
+
+    setHeroInfo(finalHero);
+
+    // Salva imediatamente no Supabase megalanche_settings
+    try {
+      await supabase.from('megalanche_settings').upsert([{
+        id: 'default',
+        hero_title: finalHero.title,
+        hero_subtitle: finalHero.subtitle,
+        hero_badge: finalHero.badge,
+        hero_image: finalHero.image,
+        promo_banner_tag: finalHero.promoBannerTag,
+        promo_banner_title: finalHero.promoBannerTitle,
+        promo_banner_subtitle: finalHero.promoBannerSubtitle,
+        promo_banner_button: finalHero.promoBannerButton,
+      }]);
+    } catch (e) {
+      console.warn('Erro ao salvar hero no Supabase:', e);
+    }
   };
 
   const resetToDefaults = () => {

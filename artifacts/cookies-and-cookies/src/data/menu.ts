@@ -37,12 +37,37 @@ export interface CategoryItem {
   icon: string;
 }
 
+// Identifica se uma foto é "enraizada / fantasma" (fotos mock de flyers, unsplash ou placeholders)
+export const isGhostImage = (url?: string): boolean => {
+  if (!url || typeof url !== 'string') return true;
+  const u = url.trim();
+  if (!u) return true;
+  if (
+    u.includes('unsplash.com') ||
+    u.includes('/images/mega/barca-') ||
+    u.includes('/images/mega/flyer-') ||
+    u.includes('/images/mega/logo-banner.jpg') ||
+    u.includes('/images/charneski') ||
+    u.includes('palha') ||
+    u.includes('placeholder')
+  ) {
+    return true;
+  }
+  return false;
+};
+
+// Retorna apenas fotos legítimas adicionadas pelo administrador (Supabase Storage, base64 ou URL customizada válida)
+export const cleanProductImage = (url?: string): string => {
+  if (isGhostImage(url)) return '';
+  return (url || '').trim();
+};
+
 export const INITIAL_CATEGORIES: CategoryItem[] = [
   { id: 'cat-todos', name: 'Todos', icon: '/images/mega/logo-oficial.jpg' },
-  { id: 'cat-barcas', name: 'Barcas', icon: '/images/mega/barca-4g.jpg' },
-  { id: 'cat-lanches', name: 'Lanches', icon: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&auto=format&fit=crop&q=80' },
-  { id: 'cat-pasteis', name: 'Pastéis', icon: '/images/mega/flyer-pasteis.jpg' },
-  { id: 'cat-bebidas', name: 'Bebidas', icon: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400&auto=format&fit=crop&q=80' },
+  { id: 'cat-barcas', name: 'Barcas', icon: '' },
+  { id: 'cat-lanches', name: 'Lanches', icon: '' },
+  { id: 'cat-pasteis', name: 'Pastéis', icon: '' },
+  { id: 'cat-bebidas', name: 'Bebidas', icon: '' },
 ];
 
 export interface StoreInfo {
@@ -80,7 +105,7 @@ export const INITIAL_HERO: HeroInfo = {
   subtitle:
     'Lanches artesanais suculentos, as famosas Barcas completas e pastéis super crocantes. Sabor que faz a diferença!',
   badge: '',
-  image: '/images/mega/logo-banner.jpg',
+  image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795213073320_n2gd7.jpg',
   promoBannerTag: 'Oferta Especial para Compartilhar',
   promoBannerTitle: 'As Lendárias Barcas do Mega Lanche Galvão!',
   promoBannerSubtitle: 'Lanches artesanais suculentos com porção gigante de batata com queijo derretido, bacon crocante e muito cheddar. Peça agora e receba quentinho!',
@@ -124,8 +149,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       '4 lanches (X-Salada ou X-Burguer à sua escolha), acompanhados de uma enorme porção de batata frita coberta com queijo derretido, cubos crocantes de bacon e muito cheddar cremoso.',
     category: 'Barcas',
-    image: '/images/mega/barca-4g.jpg',
-    images: ['/images/mega/barca-4g.jpg', '/images/mega/flyer-barcas.jpg'],
+    image: '',
+    images: [],
     available: true,
     ingredientsBadge: 'Para até 4 pessoas • 4 Lanches',
     options: [
@@ -135,7 +160,7 @@ export const INITIAL_PRODUCTS: Product[] = [
         description: '4 lanches X-Salada ou X-Burguer + Batata com queijo, bacon e cheddar.',
         price: 85.0,
         badge: 'Mais Pedida da Galera',
-        images: ['/images/mega/barca-4g.jpg'],
+        images: [],
       },
     ],
   },
@@ -146,8 +171,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       '2 lanches (X-Salada ou X-Burguer), batata frita bem servida com queijo derretido, bacon crocante, cheddar e mini pastelzinhos crocantes dourados na hora.',
     category: 'Barcas',
-    image: '/images/mega/barca-3g.jpg',
-    images: ['/images/mega/barca-3g.jpg', '/images/mega/flyer-barcas.jpg'],
+    image: '',
+    images: [],
     available: true,
     ingredientsBadge: 'Lanches + Batata Cheddar Bacon + Mini Pastéis',
     options: [
@@ -157,7 +182,7 @@ export const INITIAL_PRODUCTS: Product[] = [
         description: '2 lanches + Batata cheddar e bacon + Mini pastéis.',
         price: 75.0,
         badge: 'Favorito dos Clientes',
-        images: ['/images/mega/barca-3g.jpg'],
+        images: [],
       },
     ],
   },
@@ -168,8 +193,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       '2 lanches (X-Salada ou X-Burguer), batata frita crocante com queijo derretido, bacon em cubos, muito cheddar e fatias generosas de calabresa acebolada.',
     category: 'Barcas',
-    image: '/images/mega/barca-2g.jpg',
-    images: ['/images/mega/barca-2g.jpg', '/images/mega/flyer-barcas.jpg'],
+    image: '',
+    images: [],
     available: true,
     ingredientsBadge: 'Com calabresa acebolada especial',
     options: [
@@ -179,7 +204,7 @@ export const INITIAL_PRODUCTS: Product[] = [
         description: '2 lanches + Batata cheddar bacon + Calabresa acebolada.',
         price: 75.0,
         badge: 'Sensação da Casa',
-        images: ['/images/mega/barca-2g.jpg'],
+        images: [],
       },
     ],
   },
@@ -192,8 +217,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Pão especial quentinho, maionese artesanal da casa, hambúrguer suculento, filé de frango, bacon crocante, calabresa fatiada, ovo, presunto, queijo derretido, alface americana fresca e tomate.',
     category: 'Lanches',
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80',
-    images: ['/images/mega/flyer-lanches.jpg', 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80'],
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212630531_j1n4z.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212630531_j1n4z.jpg'],
     available: true,
     ingredientsBadge: 'Burger • Frango • Bacon • Calabresa • Ovo • Queijo',
     options: [
@@ -203,7 +228,7 @@ export const INITIAL_PRODUCTS: Product[] = [
         description: 'Super completo para quem tem fome de verdade.',
         price: 35.0,
         badge: 'Campeão de Vendas',
-        images: ['https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80'],
+        images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212630531_j1n4z.jpg'],
       },
     ],
   },
@@ -214,7 +239,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Pão macio, maionese especial, filé de frango suculento, presunto, queijo derretido, catupiry cremoso, alface e tomate.',
     category: 'Lanches',
-    image: 'https://images.unsplash.com/photo-1625813506062-0aeb1d7a094b?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212525366_3vwis.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212525366_3vwis.jpg'],
     available: true,
     ingredientsBadge: 'Frango suculento & Catupiry cremoso',
     options: [
@@ -234,7 +260,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Pão macio, maionese especial, hambúrguer de primeira, presunto, queijo derretido, muito bacon crocante, alface e tomate.',
     category: 'Lanches',
-    image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212357452_mlzqs.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212357452_mlzqs.jpg'],
     available: true,
     ingredientsBadge: 'Bacon crocante & Queijo derretido',
     options: [
@@ -254,7 +281,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Pão, maionese especial da casa, filé de frango grelhado e suculento, presunto, queijo derretido, alface fresca e fatias de tomate.',
     category: 'Lanches',
-    image: 'https://images.unsplash.com/photo-1521305916504-4a1121188589?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212358544_bne3b.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212358544_bne3b.jpg'],
     available: true,
     options: [
       {
@@ -272,7 +300,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Pão quentinho, maionese especial, hambúrguer, presunto, queijo derretido, calabresa fatiada acebolada, alface e tomate.',
     category: 'Lanches',
-    image: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=800&auto=format&fit=crop&q=80',
+    image: '',
+    images: [],
     available: true,
     options: [
       {
@@ -290,7 +319,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Pão, maionese da casa, hambúrguer, presunto, queijo derretido, ovo frito na chapa no ponto certo, alface fresca e tomate.',
     category: 'Lanches',
-    image: 'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212359519_jdnth.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212359519_jdnth.jpg'],
     available: true,
     options: [
       {
@@ -308,7 +338,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Pão, maionese especial da casa, hambúrguer saboroso, presunto, queijo derretido, alface fresca crocante e tomate.',
     category: 'Lanches',
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80',
+    image: '',
+    images: [],
     available: true,
     options: [
       {
@@ -326,7 +357,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Pão, maionese especial da casa, hambúrguer suculento, presunto e queijo mussarela derretido.',
     category: 'Lanches',
-    image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212361122_o9xdj.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212361122_o9xdj.jpg'],
     available: true,
     options: [
       {
@@ -346,8 +378,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Massa artesanal frita na hora, super crocante e sequinha, com carne moída bem temperada e queijo mussarela derretido.',
     category: 'Pastéis',
-    image: 'https://images.unsplash.com/photo-1626074353765-517a681e40be?w=800&auto=format&fit=crop&q=80',
-    images: ['/images/mega/flyer-pasteis.jpg', 'https://images.unsplash.com/photo-1626074353765-517a681e40be?w=800&auto=format&fit=crop&q=80'],
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212362670_nkj6g.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212362670_nkj6g.jpg'],
     available: true,
     ingredientsBadge: 'Mais vendido dos pastéis',
     options: [
@@ -357,6 +389,7 @@ export const INITIAL_PRODUCTS: Product[] = [
         description: 'Pastel grande, bem recheado e frito na hora.',
         price: 15.0,
         badge: 'Mais Pedido',
+        images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212362670_nkj6g.jpg'],
       },
     ],
   },
@@ -367,7 +400,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Pastel sequinho recheado com frango desfiado temperado com ervas especiais e Catupiry cremoso legítimo.',
     category: 'Pastéis',
-    image: 'https://images.unsplash.com/photo-1608897013039-887f21d8c804?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212363722_k54e6.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212363722_k54e6.jpg'],
     available: true,
     options: [
       {
@@ -385,7 +419,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Pastel frito na hora com recheio de frango suculento bem temperado e queijo mussarela derretido.',
     category: 'Pastéis',
-    image: 'https://images.unsplash.com/photo-1626074353765-517a681e40be?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212364736_c13gr.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212364736_c13gr.jpg'],
     available: true,
     options: [
       {
@@ -403,7 +438,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Presunto fatiado e bastante queijo mussarela derretido em uma massa estalando de crocante.',
     category: 'Pastéis',
-    image: 'https://images.unsplash.com/photo-1608897013039-887f21d8c804?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212365691_38dqg.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212365691_38dqg.jpg'],
     available: true,
     options: [
       {
@@ -421,7 +457,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Pastel recheado com calabresa temperada e bastante queijo mussarela derretido.',
     category: 'Pastéis',
-    image: 'https://images.unsplash.com/photo-1626074353765-517a681e40be?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212366536_a0y25.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212366536_a0y25.jpg'],
     available: true,
     options: [
       {
@@ -439,7 +476,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Massa sequinha recheada generosamente com queijo mussarela de primeira qualidade.',
     category: 'Pastéis',
-    image: 'https://images.unsplash.com/photo-1608897013039-887f21d8c804?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212368092_15gwn.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212368092_15gwn.jpg'],
     available: true,
     options: [
       {
@@ -457,7 +495,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Pastel tradicional de feira recheado com carne bovina moída refogada com cheiro verde e temperos da casa.',
     category: 'Pastéis',
-    image: 'https://images.unsplash.com/photo-1626074353765-517a681e40be?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212369498_4alu2.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212369498_4alu2.jpg'],
     available: true,
     options: [
       {
@@ -476,7 +515,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     tagline: 'Garrafa 2L bem gelada para toda a família',
     description: 'Coca-Cola Original 2L geladíssima.',
     category: 'Bebidas',
-    image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212370766_txr3x.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212370766_txr3x.jpg'],
     available: true,
     options: [
       {
@@ -494,7 +534,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     tagline: 'Garrafa pet 600ml geladíssima',
     description: 'Coca-Cola Original 600ml.',
     category: 'Bebidas',
-    image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212371383_fnsl5.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212371383_fnsl5.jpg'],
     available: true,
     options: [
       {
@@ -511,7 +552,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     tagline: 'Lata 350ml trincando de gelada',
     description: 'Coca-Cola lata 350ml geladinha.',
     category: 'Bebidas',
-    image: 'https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212372282_avfet.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212372282_avfet.jpg'],
     available: true,
     options: [
       {
@@ -528,7 +570,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     tagline: 'Lata 350ml geladíssima',
     description: 'Fanta Laranja lata 350ml.',
     category: 'Bebidas',
-    image: 'https://images.unsplash.com/photo-1624517452488-04869289c4ca?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212372985_7fcou.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212372985_7fcou.jpg'],
     available: true,
     options: [
       {
@@ -545,7 +588,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     tagline: 'Garrafa 500ml gelada com gás',
     description: 'Água mineral com gás 500ml.',
     category: 'Bebidas',
-    image: 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212374111_lt60b.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212374111_lt60b.jpg'],
     available: true,
     options: [
       {
@@ -562,7 +606,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     tagline: 'Garrafa 500ml geladinha',
     description: 'Água mineral pura sem gás 500ml.',
     category: 'Bebidas',
-    image: 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=800&auto=format&fit=crop&q=80',
+    image: 'https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212374763_6tsjf.jpg',
+    images: ['https://ounrfythtkpuldvplhec.supabase.co/storage/v1/object/public/product-images/produto_1795212374763_6tsjf.jpg'],
     available: true,
     options: [
       {

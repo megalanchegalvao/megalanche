@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   ArrowLeft,
   Lock,
@@ -141,7 +141,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
     tagline: '',
     description: '',
     category: 'Lanches',
-    image: '/images/mega/logo-banner.jpg',
+    image: '',
     available: true,
     isPopular: false,
     ingredientsBadge: '',
@@ -155,7 +155,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
   const [categoryForm, setCategoryForm] = useState<{ name: string; icon: string }>({
     name: '',
-    icon: '/images/mega/logo-oficial.jpg',
+    icon: '',
   });
 
   // Estados de formulário de Cupom
@@ -181,6 +181,16 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [storeForm, setStoreForm] = useState({ ...storeInfo });
   // Configurações do Hero & Banners
   const [heroForm, setHeroForm] = useState({ ...heroInfo });
+
+  // Manter heroForm sincronizado sempre que heroInfo mudar
+  useEffect(() => {
+    setHeroForm({ ...heroInfo });
+  }, [heroInfo]);
+
+  // Manter storeForm sincronizado sempre que storeInfo mudar
+  useEffect(() => {
+    setStoreForm({ ...storeInfo });
+  }, [storeInfo]);
 
   // Referências para upload de arquivo
   const productFileRef = useRef<HTMLInputElement>(null);
@@ -273,7 +283,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
       tagline: '',
       description: '',
       category: categories.find((c) => c.name !== 'Todos')?.name || 'Lanches',
-      image: '/images/mega/logo-banner.jpg',
+      image: '',
       available: true,
       isPopular: false,
       ingredientsBadge: '',
@@ -291,7 +301,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
       tagline: prod.tagline || '',
       description: prod.description || '',
       category: prod.category || 'Lanches',
-      image: prod.image || '/images/mega/logo-banner.jpg',
+      image: prod.image || '',
       available: prod.available ?? true,
       isPopular: isProductPopular(prod.id),
       ingredientsBadge: prod.ingredientsBadge || '',
@@ -386,10 +396,11 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
   // Upload de Logo Oficial
   const handleUploadLogo = async (file: File) => {
     try {
-      showNotification('Processando logotipo...');
+      showNotification('Enviando logotipo para a nuvem... ⏳');
       const dataUrl = await processImageFile(file);
       setStoreForm((prev) => ({ ...prev, logoImage: dataUrl }));
-      showNotification('Logotipo carregado! Clique em Salvar Loja.');
+      await updateStoreInfo({ ...storeForm, logoImage: dataUrl });
+      showNotification('Logotipo atualizado e salvo na nuvem com sucesso! ✅');
     } catch {
       showNotification('Erro ao carregar logotipo.');
     }
@@ -398,12 +409,13 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
   // Upload de Imagem Hero
   const handleUploadHeroImage = async (file: File) => {
     try {
-      showNotification('Processando imagem do Hero...');
+      showNotification('Enviando imagem do Banner Principal para a nuvem... ⏳');
       const dataUrl = await processImageFile(file);
       setHeroForm((prev) => ({ ...prev, image: dataUrl }));
-      showNotification('Imagem carregada! Clique em Salvar Banners.');
+      await updateHeroInfo({ ...heroForm, image: dataUrl });
+      showNotification('Banner principal atualizado e salvo na nuvem com sucesso! ✅');
     } catch {
-      showNotification('Erro ao carregar imagem.');
+      showNotification('Erro ao carregar imagem do banner.');
     }
   };
 
@@ -808,12 +820,19 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                         Foto do Produto (Upload ou Link)
                       </label>
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                        <div className="w-24 h-24 rounded-2xl bg-white border border-stone-200 overflow-hidden shrink-0 shadow-xs">
-                          <img
-                            src={prodForm.image}
-                            alt="Prévia"
-                            className="w-full h-full object-cover"
-                          />
+                        <div className="w-24 h-24 rounded-2xl bg-white border border-stone-200 overflow-hidden shrink-0 shadow-xs flex items-center justify-center">
+                          {prodForm.image ? (
+                            <img
+                              src={prodForm.image}
+                              alt="Prévia"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="text-center p-2 text-stone-400">
+                              <Upload size={20} className="mx-auto mb-1 text-stone-300" />
+                              <span className="text-[9px] font-semibold block leading-tight">Sem foto</span>
+                            </div>
+                          )}
                         </div>
                         <div className="flex-1 space-y-2 w-full">
                           <input
@@ -880,12 +899,19 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                     className="cursor-pointer"
                     title="Clique para editar este item"
                   >
-                    <div className="w-full h-36 rounded-2xl overflow-hidden bg-stone-100 mb-3 relative">
-                      <img
-                        src={p.image}
-                        alt={p.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
+                    <div className="w-full h-36 rounded-2xl overflow-hidden bg-stone-100 mb-3 relative flex items-center justify-center">
+                      {p.image ? (
+                        <img
+                          src={p.image}
+                          alt={p.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-stone-400 p-2 text-center">
+                          <ImageIcon size={28} className="text-stone-300 mb-1" />
+                          <span className="text-[10px] font-semibold text-stone-400">Sem foto adicionada</span>
+                        </div>
+                      )}
                       <span className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-xs">
                         {p.category}
                       </span>
@@ -980,8 +1006,15 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                   {popularProductsList.map((p, index) => (
                     <div key={p.id} className="p-3.5 rounded-2xl bg-amber-50/40 border border-amber-200 shadow-2xs flex flex-col justify-between group">
                       <div>
-                        <div className="w-full h-32 rounded-xl overflow-hidden bg-stone-100 mb-2.5 relative">
-                          <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        <div className="w-full h-32 rounded-xl overflow-hidden bg-stone-100 mb-2.5 relative flex items-center justify-center">
+                          {p.image ? (
+                            <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center text-stone-400 p-2 text-center">
+                              <ImageIcon size={22} className="text-stone-300 mb-0.5" />
+                              <span className="text-[9px] font-semibold text-stone-400">Sem foto</span>
+                            </div>
+                          )}
                           <span className="absolute top-2 left-2 bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">
                             #{index + 1}
                           </span>
@@ -1041,8 +1074,15 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                   {availableToAdd.map((p) => (
                     <div key={p.id} className="p-3.5 rounded-2xl bg-white border border-stone-200 shadow-2xs flex flex-col justify-between hover:shadow-md hover:border-red-200 transition-all group">
                       <div>
-                        <div className="w-full h-28 rounded-xl overflow-hidden bg-stone-100 mb-2 relative">
-                          <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        <div className="w-full h-28 rounded-xl overflow-hidden bg-stone-100 mb-2 relative flex items-center justify-center">
+                          {p.image ? (
+                            <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center text-stone-400 p-2 text-center">
+                              <ImageIcon size={20} className="text-stone-300 mb-0.5" />
+                              <span className="text-[9px] font-semibold text-stone-400">Sem foto</span>
+                            </div>
+                          )}
                           <span className="absolute top-2 left-2 bg-stone-900/80 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">{p.category}</span>
                         </div>
                         <h4 className="font-bold text-xs text-stone-900 line-clamp-1">{p.name}</h4>
@@ -1079,7 +1119,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
               <button
                 onClick={() => {
                   setEditingCategory(null);
-                  setCategoryForm({ name: '', icon: '/images/mega/logo-oficial.jpg' });
+                  setCategoryForm({ name: '', icon: '' });
                   setIsCategoryFormOpen(true);
                 }}
                 className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-5 py-2.5 rounded-full flex items-center gap-2 shadow-xs shrink-0"
@@ -1144,12 +1184,16 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                     </div>
 
                     <div className="flex items-center gap-4 pt-2">
-                      <div className="w-16 h-16 rounded-full p-1 ring-3 ring-red-600 bg-white overflow-hidden shrink-0 shadow-xs">
-                        <img
-                          src={categoryForm.icon}
-                          alt="Prévia"
-                          className="w-full h-full object-cover rounded-full"
-                        />
+                      <div className="w-16 h-16 rounded-full p-1 ring-3 ring-red-600 bg-white overflow-hidden shrink-0 shadow-xs flex items-center justify-center">
+                        {categoryForm.icon ? (
+                          <img
+                            src={categoryForm.icon}
+                            alt="Prévia"
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        ) : (
+                          <ImageIcon size={20} className="text-stone-300" />
+                        )}
                       </div>
                       <div>
                         <input
@@ -1534,12 +1578,19 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                   Imagem do Banner Principal
                 </label>
                 <div className="flex flex-col sm:flex-row items-center gap-4">
-                  <div className="w-24 h-24 rounded-2xl bg-stone-100 border border-stone-200 overflow-hidden shrink-0">
-                    <img
-                      src={heroForm.image}
-                      alt="Hero"
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="w-24 h-24 rounded-2xl bg-stone-100 border border-stone-200 overflow-hidden shrink-0 flex items-center justify-center">
+                    {heroForm.image ? (
+                      <img
+                        src={heroForm.image}
+                        alt="Hero"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-stone-400 p-2 text-center">
+                        <Upload size={20} className="text-stone-300 mb-1" />
+                        <span className="text-[9px] font-semibold text-stone-400">Sem banner</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1 space-y-2 w-full">
                     <input

@@ -30,6 +30,8 @@ import {
   FileText,
   Loader2,
   Instagram,
+  Flame,
+  Coffee,
 } from 'lucide-react';
 import { StoreProvider, useStore } from './context/StoreContext';
 import { type Product, type PresentationOption, type Coupon } from './data/menu';
@@ -386,11 +388,23 @@ function AppContent() {
                       }`}
                     >
                       <div className="w-full h-full rounded-full overflow-hidden bg-white shadow-xs border border-stone-200 flex items-center justify-center">
-                        <img
-                          src={cat.icon}
-                          alt={cat.name}
-                          className="w-full h-full object-cover"
-                        />
+                        {cat.icon ? (
+                          <img
+                            src={cat.icon}
+                            alt={cat.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : cat.name === 'Barcas' ? (
+                          <Flame size={22} className="text-amber-600" />
+                        ) : cat.name === 'Lanches' ? (
+                          <UtensilsCrossed size={22} className="text-red-600" />
+                        ) : cat.name === 'Pastéis' ? (
+                          <Sparkles size={22} className="text-amber-500" />
+                        ) : cat.name === 'Bebidas' ? (
+                          <Coffee size={22} className="text-blue-500" />
+                        ) : (
+                          <Store size={22} className="text-red-600" />
+                        )}
                       </div>
                     </div>
                     <span
@@ -516,12 +530,19 @@ function AppContent() {
                     </div>
 
                     {/* Imagem do Produto */}
-                    <div className="w-full h-28 sm:h-36 rounded-xl overflow-hidden bg-stone-50 mb-2">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
+                    <div className="w-full h-28 sm:h-36 rounded-xl overflow-hidden bg-stone-50 mb-2 flex items-center justify-center">
+                      {product.image ? (
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-stone-100 text-stone-400 p-2">
+                          <UtensilsCrossed size={24} className="text-stone-300 mb-1" />
+                          <span className="text-[10px] text-stone-400 font-semibold text-center line-clamp-1">{product.name}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Informações */}
@@ -633,12 +654,19 @@ function AppContent() {
                 >
                   <div>
                     {/* Imagem do Produto com Tag de Ingredientes */}
-                    <div className="w-full h-28 sm:h-36 rounded-xl overflow-hidden bg-stone-100 relative mb-2">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
+                    <div className="w-full h-28 sm:h-36 rounded-xl overflow-hidden bg-stone-100 relative mb-2 flex items-center justify-center">
+                      {product.image ? (
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-stone-100 text-stone-400 p-2">
+                          <UtensilsCrossed size={24} className="text-stone-300 mb-1" />
+                          <span className="text-[10px] text-stone-400 font-semibold text-center line-clamp-1">{product.name}</span>
+                        </div>
+                      )}
                       <button
                         type="button"
                         onClick={(e) => toggleFavorite(product.id, e)}
@@ -983,22 +1011,36 @@ function ProductDetailModal({
       <div className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto shadow-2xl modal-enter flex flex-col">
 
         {/* Imagem do Produto no Topo com Botão Fechar */}
-        <div className="relative h-60 w-full bg-stone-100 shrink-0">
-          <img
-            src={selectedOption.images?.[0] || product.image}
-            alt={product.name}
-            className="w-full h-full object-cover"
-          />
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
-          >
-            <X size={18} />
-          </button>
-          <div className="absolute top-4 left-4 bg-red-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
-            {product.category}
+        {(selectedOption.images?.[0] || product.image) ? (
+          <div className="relative h-60 w-full bg-stone-100 shrink-0">
+            <img
+              src={selectedOption.images?.[0] || product.image}
+              alt={product.name}
+              className="w-full h-full object-cover"
+            />
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+            >
+              <X size={18} />
+            </button>
+            <div className="absolute top-4 left-4 bg-red-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+              {product.category}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="p-5 pb-0 flex items-center justify-between border-b border-stone-100">
+            <div className="bg-red-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+              {product.category}
+            </div>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-full bg-stone-100 text-stone-600 flex items-center justify-center hover:bg-stone-200 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
 
         {/* Detalhes do Produto */}
         <div className="p-5 space-y-4 flex-1">
@@ -1296,11 +1338,17 @@ function BagDrawer({
                 key={item.id}
                 className="p-3 rounded-2xl bg-stone-50 border border-stone-200/80 flex gap-3"
               >
-                <img
-                  src={item.image}
-                  alt={item.productName}
-                  className="w-16 h-16 rounded-xl object-cover bg-white shrink-0"
-                />
+                {item.image ? (
+                  <img
+                    src={item.image}
+                    alt={item.productName}
+                    className="w-16 h-16 rounded-xl object-cover bg-white shrink-0"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-xl bg-stone-200 flex items-center justify-center text-stone-400 shrink-0">
+                    <UtensilsCrossed size={18} />
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
                     <h5 className="font-bold text-xs text-stone-900 leading-snug">
