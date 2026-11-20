@@ -12,7 +12,7 @@ import {
   INITIAL_HERO,
   INITIAL_CATEGORIES,
 } from '../data/menu';
-import { supabase, uploadProductImageToStorage } from '../lib/supabase';
+import { supabase, uploadProductImageToStorage, uploadBase64ImageToStorage } from '../lib/supabase';
 
 interface StoreContextType {
   products: Product[];
@@ -235,20 +235,61 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     async function loadFromSupabase() {
       try {
         const { data: dbProducts, error: prodErr } = await supabase.from('megalanche_products').select('*');
-        if (!prodErr && dbProducts && dbProducts.length > 0) {
-          const mappedProducts: Product[] = dbProducts.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            tagline: p.tagline,
-            description: p.description,
-            category: p.category,
-            image: p.image,
-            images: p.images,
-            available: p.available,
-            ingredientsBadge: p.ingredients_badge ?? p.ingredientsBadge,
-            options: p.options || [],
-          }));
-          setProducts(mappedProducts);
+        if (!prodErr && dbProducts) {
+          if (dbProducts.length > 0) {
+            const mappedProducts: Product[] = dbProducts.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              tagline: p.tagline,
+              description: p.description,
+              category: p.category,
+              image: p.image,
+              images: p.images,
+              available: p.available,
+              ingredientsBadge: p.ingredients_badge ?? p.ingredientsBadge,
+              options: p.options || [],
+            }));
+
+            // Mescla com produtos da memória para nunca perder itens
+            setProducts((prev) => {
+              const base = prev && prev.length > 0 ? prev : INITIAL_PRODUCTS;
+              const merged = base.map((p) => {
+                const found = mappedProducts.find((dbP) => dbP.id === p.id);
+                return found ? { ...p, ...found } : p;
+              });
+              const additions = mappedProducts.filter((dbP) => !base.some((p) => p.id === dbP.id));
+              return [...merged, ...additions];
+            });
+          } else {
+            // Se o banco foi criado agora mas está vazio, tenta migrar o cardápio que o usuário já editou localmente
+            try {
+              const localSaved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
+              const prodsToSync: Product[] = localSaved ? JSON.parse(localSaved) : INITIAL_PRODUCTS;
+              if (Array.isArray(prodsToSync) && prodsToSync.length > 0) {
+                for (const prod of prodsToSync) {
+                  let finalImg = prod.image;
+                  if (finalImg && finalImg.startsWith('data:image/')) {
+                    const uploaded = await uploadBase64ImageToStorage(finalImg);
+                    if (uploaded) finalImg = uploaded;
+                  }
+                  await supabase.from('megalanche_products').upsert([{
+                    id: prod.id,
+                    name: prod.name,
+                    tagline: prod.tagline,
+                    description: prod.description,
+                    category: prod.category,
+                    image: finalImg,
+                    images: prod.images || [],
+                    available: prod.available,
+                    ingredients_badge: prod.ingredientsBadge || '',
+                    options: prod.options || [],
+                  }]);
+                }
+              }
+            } catch (seedErr) {
+              console.warn('Erro ao sincronizar produtos locais:', seedErr);
+            }
+          }
         }
 
         const { data: dbCoupons, error: coupErr } = await supabase.from('megalanche_coupons').select('*');
@@ -375,19 +416,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   const updateProduct = async (updated: Product) => {
-    setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    let finalProduct = { ...updated };
+    if (finalProduct.image && finalProduct.image.startsWith('data:image/')) {
+      try {
+        const cloudUrl = await uploadBase64ImageToStorage(finalProduct.image);
+        if (cloudUrl) {
+          finalProduct.image = cloudUrl;
+        }
+      } catch {}
+    }
+
+    setProducts((prev) => prev.map((p) => (p.id === finalProduct.id ? finalProduct : p)));
     try {
       const payload = {
-        id: updated.id,
-        name: updated.name,
-        tagline: updated.tagline,
-        description: updated.description,
-        category: updated.category,
-        image: updated.image,
-        images: updated.images || [],
-        available: updated.available,
-        ingredients_badge: updated.ingredientsBadge || '',
-        options: updated.options || [],
+        id: finalProduct.id,
+        name: finalProduct.name,
+        tagline: finalProduct.tagline,
+        description: finalProduct.description,
+        category: finalProduct.category,
+        image: finalProduct.image,
+        images: finalProduct.images || [],
+        available: finalProduct.available,
+        ingredients_badge: finalProduct.ingredientsBadge || '',
+        options: finalProduct.options || [],
       };
       await supabase.from('megalanche_products').upsert([payload]);
     } catch {}

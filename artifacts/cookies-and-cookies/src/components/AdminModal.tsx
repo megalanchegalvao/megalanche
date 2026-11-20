@@ -21,9 +21,13 @@ import {
   Flame,
   ArrowUp,
   ArrowDown,
+  Database,
+  Copy,
+  Download,
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { type Product, type Coupon, type PresentationOption, type CategoryItem } from '../data/menu';
+import { SUPABASE_SQL_SCHEMA } from '../lib/supabase';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -337,7 +341,11 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
       showNotification('Processando imagem...');
       const dataUrl = await processImageFile(file);
       setProdForm((prev) => ({ ...prev, image: dataUrl }));
-      showNotification('Imagem carregada! ✅');
+      if (dataUrl.startsWith('http')) {
+        showNotification('Imagem salva na nuvem (sincronizada para todos os aparelhos)! ✅');
+      } else {
+        showNotification('Imagem salva localmente neste aparelho. (Execute o SQL no Supabase para sincronizar em outros) ⚠️');
+      }
     } catch {
       showNotification('Erro ao carregar imagem.');
     }
@@ -389,6 +397,22 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
     e.preventDefault();
     await updateHeroInfo(heroForm);
     showNotification('Banners e textos salvos! ✅');
+  };
+
+  const handleExportMenuJson = () => {
+    try {
+      const data = JSON.stringify(products, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cardapio-megalanche-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showNotification('Arquivo do cardápio baixado com sucesso! ✅');
+    } catch {
+      showNotification('Erro ao exportar cardápio.');
+    }
   };
 
   const filteredAdminProducts = products.filter((p) => {
@@ -1215,6 +1239,49 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
               <p className="text-xs text-stone-500">
                 Altere a logo oficial, nome da lanchonete, número do WhatsApp para receber pedidos, horários e senha.
               </p>
+            </div>
+
+            {/* Painel de Sincronização em Nuvem (Supabase) */}
+            <div className="p-6 bg-gradient-to-br from-amber-50 to-orange-50/40 rounded-3xl border border-amber-200/80 shadow-xs space-y-3">
+              <div className="flex items-center gap-2">
+                <Database className="text-amber-700" size={18} />
+                <h3 className="font-bold text-sm text-amber-950">
+                  Sincronização em Nuvem & Fotos (Supabase)
+                </h3>
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Para que as novas fotos e alterações apareçam em outros celulares, computadores e guias anônimas, o seu banco Supabase precisa estar com as tabelas criadas. Se ainda não executou, copie o código SQL abaixo e rode no SQL Editor do seu Supabase.
+              </p>
+              <div className="flex flex-wrap gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
+                    showNotification('Código SQL copiado para a área de transferência! ✅');
+                  }}
+                  className="bg-amber-700 hover:bg-amber-800 text-white font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-colors"
+                >
+                  <Copy size={13} />
+                  <span>Copiar Código SQL do Supabase</span>
+                </button>
+                <a
+                  href="https://supabase.com/dashboard/project/uiytreumbuaguqvoiczz/sql/new"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="bg-white hover:bg-stone-50 border border-amber-300 text-amber-900 font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-2xs transition-colors"
+                >
+                  <ExternalLink size={13} />
+                  <span>Abrir SQL Editor no Supabase</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={handleExportMenuJson}
+                  className="bg-white hover:bg-stone-50 border border-stone-300 text-stone-800 font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-2xs transition-colors ml-auto"
+                >
+                  <Download size={13} />
+                  <span>Exportar Cardápio (JSON)</span>
+                </button>
+              </div>
             </div>
 
             {/* Logotipo da Loja com Upload */}

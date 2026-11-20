@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Chave pública (anon/publishable) do Supabase para o cliente frontend
 export const SUPABASE_PUBLISHABLE_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_CfPbyPx_TzL61eD5QWXVjg_4Ql99gU-';
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_cpUuM1nm2u5H2faqgrcNxQ_O6yMQ4az';
 export const SUPABASE_KEY = SUPABASE_PUBLISHABLE_KEY;
 export const SUPABASE_ANON_KEY = SUPABASE_PUBLISHABLE_KEY;
 
@@ -115,6 +115,47 @@ export async function uploadProductImageToStorage(
     return null;
   } catch (err) {
     console.warn('Erro ao tentar upload de imagem do produto:', err);
+    return null;
+  }
+}
+
+/**
+ * Faz upload de uma string data:image/ (base64) para o bucket 'product-images'.
+ * Retorna a URL pública ou null.
+ */
+export async function uploadBase64ImageToStorage(dataUrl: string): Promise<string | null> {
+  if (!dataUrl || !dataUrl.startsWith('data:image/')) return null;
+  try {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    const ext = dataUrl.includes('image/png') ? 'png' : 'jpg';
+    const fileName = `produto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+
+    const { data, error } = await supabase.storage
+      .from('product-images')
+      .upload(fileName, blob, {
+        cacheControl: '31536000',
+        upsert: false,
+        contentType: ext === 'png' ? 'image/png' : 'image/jpeg',
+      });
+
+    if (error) {
+      console.warn('Supabase Storage uploadBase64 aviso:', error);
+      return null;
+    }
+
+    if (data?.path) {
+      const { data: publicData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(data.path);
+
+      if (publicData?.publicUrl) {
+        return publicData.publicUrl;
+      }
+    }
+    return null;
+  } catch (err) {
+    console.warn('Erro uploadBase64ImageToStorage:', err);
     return null;
   }
 }
@@ -258,33 +299,58 @@ insert into storage.buckets (id, name, public)
 values ('product-images', 'product-images', true)
 on conflict (id) do nothing;
 
-create policy "Permitir upload publico product-images" on storage.objects
-for insert with check (bucket_id = 'product-images');
-
-create policy "Permitir leitura publica product-images" on storage.objects
-for select using (bucket_id = 'product-images');
-
 -- 5. Bucket de Armazenamento para Comprovantes Pix (PDF e Imagens)
 insert into storage.buckets (id, name, public) 
 values ('comprovantes', 'comprovantes', true)
 on conflict (id) do nothing;
-
-create policy "Permitir upload publico de comprovantes" on storage.objects 
-for insert with check (bucket_id = 'comprovantes');
-
-create policy "Permitir leitura publica de comprovantes" on storage.objects 
-for select using (bucket_id = 'comprovantes');
 
 -- Habilitar Políticas de Segurança RLS
 alter table public.megalanche_settings enable row level security;
 alter table public.megalanche_products enable row level security;
 alter table public.megalanche_coupons enable row level security;
 
-create policy "Permitir leitura pública configurações" on public.megalanche_settings for select using (true);
-create policy "Permitir leitura pública produtos" on public.megalanche_products for select using (true);
-create policy "Permitir leitura pública cupons" on public.megalanche_coupons for select using (true);
+-- Políticas com verificação de existência para evitar erros ao re-executar
+do $$
+begin
+  -- Storage: product-images
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'Permitir upload publico product-images') then
+    create policy "Permitir upload publico product-images" on storage.objects for insert with check (bucket_id = 'product-images');
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'Permitir leitura publica product-images') then
+    create policy "Permitir leitura publica product-images" on storage.objects for select using (bucket_id = 'product-images');
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'Permitir update publico product-images') then
+    create policy "Permitir update publico product-images" on storage.objects for update with check (bucket_id = 'product-images');
+  end if;
 
-create policy "Permitir gestão total anon configurações" on public.megalanche_settings for all using (true);
-create policy "Permitir gestão total anon produtos" on public.megalanche_products for all using (true);
-create policy "Permitir gestão total anon cupons" on public.megalanche_coupons for all using (true);
+  -- Storage: comprovantes
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'Permitir upload publico de comprovantes') then
+    create policy "Permitir upload publico de comprovantes" on storage.objects for insert with check (bucket_id = 'comprovantes');
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'Permitir leitura publica de comprovantes') then
+    create policy "Permitir leitura publica de comprovantes" on storage.objects for select using (bucket_id = 'comprovantes');
+  end if;
+
+  -- Tabelas: Leitura pública
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'megalanche_settings' and policyname = 'Permitir leitura pública configurações') then
+    create policy "Permitir leitura pública configurações" on public.megalanche_settings for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'megalanche_products' and policyname = 'Permitir leitura pública produtos') then
+    create policy "Permitir leitura pública produtos" on public.megalanche_products for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'megalanche_coupons' and policyname = 'Permitir leitura pública cupons') then
+    create policy "Permitir leitura pública cupons" on public.megalanche_coupons for select using (true);
+  end if;
+
+  -- Tabelas: Gestão total anon
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'megalanche_settings' and policyname = 'Permitir gestão total anon configurações') then
+    create policy "Permitir gestão total anon configurações" on public.megalanche_settings for all using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'megalanche_products' and policyname = 'Permitir gestão total anon produtos') then
+    create policy "Permitir gestão total anon produtos" on public.megalanche_products for all using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'megalanche_coupons' and policyname = 'Permitir gestão total anon cupons') then
+    create policy "Permitir gestão total anon cupons" on public.megalanche_coupons for all using (true);
+  end if;
+end $$;
 `;
