@@ -1,5 +1,5 @@
 [build]
-  command = "cd artifacts/cookies-and-cookies && npm install && npm run build"
+  command = "cd artifacts/cookies-and-cookies && pnpm run build"
   publish = "artifacts/cookies-and-cookies/dist/public"
 
 [[redirects]]
