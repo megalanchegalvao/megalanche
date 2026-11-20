@@ -6,6 +6,7 @@ import {
   type HeroInfo,
   type CategoryItem,
   INITIAL_PRODUCTS,
+  INITIAL_POPULAR_PRODUCT_IDS,
   INITIAL_COUPONS,
   INITIAL_STORE_INFO,
   INITIAL_HERO,
@@ -15,6 +16,7 @@ import { supabase } from '../lib/supabase';
 
 interface StoreContextType {
   products: Product[];
+  popularProductIds: string[];
   coupons: Coupon[];
   storeInfo: StoreInfo;
   heroInfo: HeroInfo;
@@ -25,6 +27,14 @@ interface StoreContextType {
   addProduct: (product: Omit<Product, 'id'>) => Promise<Product>;
   updateProduct: (product: Product) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
+
+  // Mais Vendidos
+  setPopularProductIds: (ids: string[]) => void;
+  togglePopularProduct: (productId: string) => void;
+  addPopularProduct: (productId: string) => void;
+  removePopularProduct: (productId: string) => void;
+  reorderPopularProduct: (productId: string, direction: 'up' | 'down') => void;
+  isProductPopular: (productId: string) => boolean;
 
   // Categorias
   updateCategory: (category: CategoryItem) => Promise<void>;
@@ -50,6 +60,7 @@ const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
   PRODUCTS: 'megalanche_galvao_products_v5',
+  POPULAR_IDS: 'megalanche_galvao_popular_ids_v1',
   COUPONS: 'megalanche_galvao_coupons_v5',
   STORE_INFO: 'megalanche_galvao_store_info_v6',
   HERO_INFO: 'megalanche_galvao_hero_info_v5',
@@ -93,6 +104,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return INITIAL_PRODUCTS;
     } catch {
       return INITIAL_PRODUCTS;
+    }
+  });
+
+  const [popularProductIds, setPopularProductIdsState] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.POPULAR_IDS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+      return INITIAL_POPULAR_PRODUCT_IDS;
+    } catch {
+      return INITIAL_POPULAR_PRODUCT_IDS;
     }
   });
 
@@ -163,6 +189,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       console.warn('Falha ao salvar produtos no localStorage:', e);
     }
   }, [products]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.POPULAR_IDS, JSON.stringify(popularProductIds));
+    } catch (e) {
+      console.warn('Falha ao salvar mais vendidos no localStorage:', e);
+    }
+  }, [popularProductIds]);
 
   useEffect(() => {
     try {
@@ -346,9 +380,54 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const deleteProduct = async (productId: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== productId));
+    setPopularProductIdsState((prev) => prev.filter((id) => id !== productId));
     try {
       await supabase.from('megalanche_products').delete().eq('id', productId);
     } catch {}
+  };
+
+  // Funções de Mais Vendidos
+  const setPopularProductIds = (ids: string[]) => {
+    setPopularProductIdsState(ids);
+  };
+
+  const addPopularProduct = (productId: string) => {
+    setPopularProductIdsState((prev) => {
+      if (prev.includes(productId)) return prev;
+      return [...prev, productId];
+    });
+  };
+
+  const removePopularProduct = (productId: string) => {
+    setPopularProductIdsState((prev) => prev.filter((id) => id !== productId));
+  };
+
+  const togglePopularProduct = (productId: string) => {
+    setPopularProductIdsState((prev) => {
+      if (prev.includes(productId)) {
+        return prev.filter((id) => id !== productId);
+      } else {
+        return [...prev, productId];
+      }
+    });
+  };
+
+  const reorderPopularProduct = (productId: string, direction: 'up' | 'down') => {
+    setPopularProductIdsState((prev) => {
+      const index = prev.indexOf(productId);
+      if (index === -1) return prev;
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+      const copy = [...prev];
+      const temp = copy[index];
+      copy[index] = copy[targetIndex];
+      copy[targetIndex] = temp;
+      return copy;
+    });
+  };
+
+  const isProductPopular = (productId: string) => {
+    return popularProductIds.includes(productId);
   };
 
   // Funções de Categorias
@@ -470,11 +549,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const resetToDefaults = () => {
     setProducts(INITIAL_PRODUCTS);
+    setPopularProductIdsState(INITIAL_POPULAR_PRODUCT_IDS);
     setCategories(INITIAL_CATEGORIES);
     setCoupons(INITIAL_COUPONS);
     setStoreInfo(INITIAL_STORE_INFO);
     setHeroInfo(INITIAL_HERO);
     localStorage.removeItem(STORAGE_KEYS.PRODUCTS);
+    localStorage.removeItem(STORAGE_KEYS.POPULAR_IDS);
     localStorage.removeItem(STORAGE_KEYS.CATEGORIES);
     localStorage.removeItem(STORAGE_KEYS.COUPONS);
     localStorage.removeItem(STORAGE_KEYS.STORE_INFO);
@@ -485,6 +566,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     <StoreContext.Provider
       value={{
         products,
+        popularProductIds,
         categories,
         coupons,
         storeInfo,
@@ -493,6 +575,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         addProduct,
         updateProduct,
         deleteProduct,
+        setPopularProductIds,
+        togglePopularProduct,
+        addPopularProduct,
+        removePopularProduct,
+        reorderPopularProduct,
+        isProductPopular,
         updateCategory,
         addCategory,
         deleteCategory,

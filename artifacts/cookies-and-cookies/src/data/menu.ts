@@ -16,6 +16,7 @@ export interface Product {
   image: string;
   images?: string[];
   available: boolean;
+  isPopular?: boolean;
   ingredientsBadge?: string;
   options: PresentationOption[];
 }
@@ -104,6 +105,15 @@ export const INITIAL_STORE_INFO: StoreInfo = {
   pickupTimeEstimate: '',
   adminPin: 'Galvao2026On',
 };
+
+export const INITIAL_POPULAR_PRODUCT_IDS: string[] = [
+  'barca-4g',
+  'barca-3g',
+  'barca-2g',
+  'x-mega',
+  'x-frango-catupiry',
+  'x-bacon',
+];
 
 export const INITIAL_PRODUCTS: Product[] = [
   // --- BARCAS ESPECIAIS ---

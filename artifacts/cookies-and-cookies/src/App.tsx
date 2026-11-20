@@ -61,7 +61,7 @@ export default function App() {
 }
 
 function AppContent() {
-  const { products, categories, storeInfo, heroInfo, coupons, validateCoupon } = useStore();
+  const { products, categories, storeInfo, heroInfo, coupons, validateCoupon, popularProductIds } = useStore();
 
   // Estados principais
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -118,10 +118,15 @@ function AppContent() {
     });
   }, [products, activeCategory, searchQuery]);
 
-  // "Mais Pedidos" (Popular Picks)
+  // "Mais Vendidos / Mais Pedidos" (Popular Picks)
   const popularPicks = useMemo(() => {
-    return products.slice(0, 6);
-  }, [products]);
+    if (!popularProductIds || popularProductIds.length === 0) {
+      return [];
+    }
+    return popularProductIds
+      .map((id) => products.find((p) => p.id === id))
+      .filter((p): p is Product => Boolean(p && p.available));
+  }, [products, popularProductIds]);
 
   const handleApplyCoupon = (code: string) => {
     const res = validateCoupon(code, subtotalCartValue);
@@ -463,12 +468,12 @@ function AppContent() {
           </div>
         </div>
 
-        {/* ===== SEÇÃO: MAIS PEDIDOS / POPULAR PICKS ===== */}
-        {activeCategory === 'Todos' && !searchQuery && (
+        {/* ===== SEÇÃO: MAIS VENDIDOS / MAIS PEDIDOS ===== */}
+        {activeCategory === 'Todos' && !searchQuery && popularPicks.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-extrabold text-stone-900 text-base sm:text-xl font-display flex items-center gap-2">
-                <span>Mais Pedidos 🔥</span>
+                <span>Mais Vendidos 🔥</span>
                 <span className="text-xs font-normal text-stone-500 hidden sm:inline">
                   (Os favoritos dos nossos clientes)
                 </span>

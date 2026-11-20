@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   ArrowLeft,
   Lock,
@@ -18,6 +18,9 @@ import {
   LogOut,
   Sparkles,
   X,
+  Flame,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { type Product, type Coupon, type PresentationOption, type CategoryItem } from '../data/menu';
@@ -33,6 +36,7 @@ const formatBRL = (value: number) =>
 export function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const {
     products,
+    popularProductIds,
     categories,
     coupons,
     storeInfo,
@@ -40,6 +44,12 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
     addProduct,
     updateProduct,
     deleteProduct,
+    setPopularProductIds,
+    togglePopularProduct,
+    addPopularProduct,
+    removePopularProduct,
+    reorderPopularProduct,
+    isProductPopular,
     updateCategory,
     addCategory,
     deleteCategory,
@@ -55,11 +65,39 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
   const [showPin, setShowPin] = useState(false);
-  const [activeTab, setActiveTab] = useState<'products' | 'categories' | 'store' | 'hero' | 'coupons'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'popular' | 'categories' | 'store' | 'hero' | 'coupons'>('products');
   const [toast, setToast] = useState<string | null>(null);
 
   // Busca dentro do admin
   const [adminSearch, setAdminSearch] = useState('');
+
+  // Estados para aba Mais Vendidos
+  const [popularSearch, setPopularSearch] = useState('');
+  const [popularCategoryFilter, setPopularCategoryFilter] = useState('Todas');
+
+  // Lanches atualmente nos Mais Vendidos na ordem
+  const popularProductsList = useMemo(() => {
+    return popularProductIds
+      .map((id) => products.find((p) => p.id === id))
+      .filter((p): p is Product => Boolean(p));
+  }, [popularProductIds, products]);
+
+  // Lanches que ainda NÃO estão nos Mais Vendidos para poder selecionar e adicionar
+  const availableToAdd = useMemo(() => {
+    return products.filter((p) => {
+      const isAlreadyPopular = popularProductIds.includes(p.id);
+      if (isAlreadyPopular) return false;
+
+      const matchesCat =
+        popularCategoryFilter === 'Todas' ||
+        p.category.toLowerCase() === popularCategoryFilter.toLowerCase();
+      const q = popularSearch.toLowerCase().trim();
+      const matchesSearch =
+        !q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q);
+
+      return matchesCat && matchesSearch;
+    });
+  }, [products, popularProductIds, popularCategoryFilter, popularSearch]);
 
   // Estados de formulário de Produto
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -71,6 +109,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
     category: string;
     image: string;
     available: boolean;
+    isPopular: boolean;
     ingredientsBadge: string;
     options: PresentationOption[];
   }>({
@@ -80,6 +119,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
     category: 'Lanches',
     image: '/images/mega/logo-banner.jpg',
     available: true,
+    isPopular: false,
     ingredientsBadge: '',
     options: [
       { id: 'opt-1', name: 'Individual', description: 'Porção individual', price: 25 },
@@ -211,6 +251,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
       category: categories.find((c) => c.name !== 'Todos')?.name || 'Lanches',
       image: '/images/mega/logo-banner.jpg',
       available: true,
+      isPopular: false,
       ingredientsBadge: '',
       options: [
         { id: `opt-${Date.now()}`, name: 'Padrão', description: '', price: 25 },
@@ -228,6 +269,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
       category: prod.category || 'Lanches',
       image: prod.image || '/images/mega/logo-banner.jpg',
       available: prod.available ?? true,
+      isPopular: isProductPopular(prod.id),
       ingredientsBadge: prod.ingredientsBadge || '',
       options: prod.options && prod.options.length > 0
         ? prod.options
@@ -255,10 +297,17 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
     ];
 
     const productPayload = {
-      ...prodForm,
+      name: prodForm.name,
+      tagline: prodForm.tagline,
+      description: prodForm.description,
+      category: prodForm.category,
+      image: prodForm.image,
+      available: prodForm.available,
+      ingredientsBadge: prodForm.ingredientsBadge,
       options: finalOptions,
     };
 
+    let targetProductId = editingProduct ? editingProduct.id : '';
     if (editingProduct) {
       await updateProduct({
         ...editingProduct,
@@ -266,9 +315,19 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
       });
       showNotification(`Produto "${prodForm.name}" atualizado! ✅`);
     } else {
-      await addProduct(productPayload);
+      const created = await addProduct(productPayload);
+      targetProductId = created.id;
       showNotification(`Novo produto "${prodForm.name}" criado! ✅`);
     }
+
+    if (targetProductId) {
+      if (prodForm.isPopular) {
+        addPopularProduct(targetProductId);
+      } else {
+        removePopularProduct(targetProductId);
+      }
+    }
+
     setIsProductFormOpen(false);
   };
 
@@ -401,6 +460,16 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
             }`}
           >
             🍔 Cardápio de Produtos ({products.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('popular')}
+            className={`py-3.5 px-4 border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'popular'
+                ? 'border-red-600 text-red-600 font-extrabold'
+                : 'border-transparent text-stone-500 hover:text-stone-900'
+            }`}
+          >
+            🔥 Mais Vendidos ({popularProductIds.length})
           </button>
           <button
             onClick={() => setActiveTab('categories')}
@@ -554,6 +623,20 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                       </div>
                     </div>
 
+                    {/* Destaque nos Mais Vendidos */}
+                    <button
+                      type="button"
+                      onClick={() => setProdForm((prev) => ({ ...prev, isPopular: !prev.isPopular }))}
+                      className={`w-full py-2.5 px-4 rounded-xl border flex items-center justify-between font-bold text-xs transition-colors ${
+                        prodForm.isPopular
+                          ? 'bg-amber-50 border-amber-300 text-amber-800'
+                          : 'bg-stone-50 border-stone-200 text-stone-600'
+                      }`}
+                    >
+                      <span>{prodForm.isPopular ? '🔥 Exibir nos Mais Vendidos' : 'Não exibir nos Mais Vendidos'}</span>
+                      <span className="text-[10px] underline">Alternar</span>
+                    </button>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="font-bold text-stone-700 block mb-1">
@@ -606,6 +689,20 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                         </button>
                       </div>
                     </div>
+
+                    {/* Destaque nos Mais Vendidos */}
+                    <button
+                      type="button"
+                      onClick={() => setProdForm((prev) => ({ ...prev, isPopular: !prev.isPopular }))}
+                      className={`w-full py-2.5 px-4 rounded-xl border flex items-center justify-between font-bold text-xs transition-colors ${
+                        prodForm.isPopular
+                          ? 'bg-amber-50 border-amber-300 text-amber-800'
+                          : 'bg-stone-50 border-stone-200 text-stone-600'
+                      }`}
+                    >
+                      <span>{prodForm.isPopular ? '🔥 Exibir nos Mais Vendidos' : 'Não exibir nos Mais Vendidos'}</span>
+                      <span className="text-[10px] underline">Alternar</span>
+                    </button>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
@@ -734,6 +831,11 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                       <span className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-xs">
                         {p.category}
                       </span>
+                      {isProductPopular(p.id) && (
+                        <span className="absolute bottom-2 left-2 bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1">
+                          🔥 Mais Vendido
+                        </span>
+                      )}
                       {!p.available && (
                         <span className="absolute top-2 right-2 bg-stone-900/90 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-xs">
                           Esgotado
@@ -782,6 +884,121 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* ABA: MAIS VENDIDOS */}
+        {/* ======================================================== */}
+        {activeTab === 'popular' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-stone-200/80 shadow-xs">
+              <div>
+                <h2 className="font-display font-black text-xl text-stone-900 flex items-center gap-2">
+                  Gestão dos Mais Vendidos
+                  <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                    🔥 {popularProductsList.length} lanches
+                  </span>
+                </h2>
+                <p className="text-xs text-stone-500 mt-1">
+                  Selecione e remova lanches da seção <strong>"Mais Vendidos"</strong> que aparece no topo da página inicial. Use as setas para reordenar.
+                </p>
+              </div>
+            </div>
+
+            {/* Lanches atualmente na seção */}
+            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-xs space-y-4">
+              <h3 className="font-bold text-sm text-stone-900 flex items-center gap-2 border-b border-stone-100 pb-3">
+                🔥 Lanches na Seção ({popularProductsList.length})
+              </h3>
+
+              {popularProductsList.length === 0 ? (
+                <div className="p-8 text-center bg-stone-50 rounded-2xl border border-dashed border-stone-300">
+                  <p className="text-xs text-stone-500">Nenhum lanche na sessão. Selecione abaixo para adicionar.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {popularProductsList.map((p, index) => (
+                    <div key={p.id} className="p-3.5 rounded-2xl bg-amber-50/40 border border-amber-200 shadow-2xs flex flex-col justify-between group">
+                      <div>
+                        <div className="w-full h-32 rounded-xl overflow-hidden bg-stone-100 mb-2.5 relative">
+                          <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <span className="absolute top-2 left-2 bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs">
+                            #{index + 1}
+                          </span>
+                          <span className="absolute top-2 right-2 bg-stone-900/80 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+                            {p.category}
+                          </span>
+                        </div>
+                        <h4 className="font-extrabold text-xs text-stone-900 line-clamp-1">{p.name}</h4>
+                        <p className="font-black text-sm text-stone-900 font-display mt-1">{formatBRL(p.options[0]?.price || 0)}</p>
+                      </div>
+
+                      <div className="pt-2.5 mt-2.5 border-t border-amber-200/80 flex items-center justify-between gap-1.5">
+                        <div className="flex items-center gap-1">
+                          <button type="button" onClick={() => reorderPopularProduct(p.id, 'up')} disabled={index === 0} title="Mover para cima" className="w-7 h-7 rounded-lg bg-white border border-stone-200 text-stone-600 disabled:opacity-30 hover:bg-stone-100 flex items-center justify-center transition-colors">
+                            <ArrowUp size={13} />
+                          </button>
+                          <button type="button" onClick={() => reorderPopularProduct(p.id, 'down')} disabled={index === popularProductsList.length - 1} title="Mover para baixo" className="w-7 h-7 rounded-lg bg-white border border-stone-200 text-stone-600 disabled:opacity-30 hover:bg-stone-100 flex items-center justify-center transition-colors">
+                            <ArrowDown size={13} />
+                          </button>
+                        </div>
+                        <button type="button" onClick={() => { removePopularProduct(p.id); showNotification(`"${p.name}" removido dos Mais Vendidos.`); }} className="px-3 py-1.5 rounded-full bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95">
+                          <Trash2 size={12} /> Remover
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Selecionar novos lanches */}
+            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
+                <h3 className="font-bold text-sm text-stone-900 flex items-center gap-2">
+                  <Plus size={16} className="text-red-600" /> Adicionar Lanches do Cardápio
+                </h3>
+                <div className="relative w-full sm:w-64">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input type="text" placeholder="Filtrar por nome..." value={popularSearch} onChange={(e) => setPopularSearch(e.target.value)} className="w-full bg-stone-50 border border-stone-200 rounded-full pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-red-600" />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                {['Todas', ...categories.filter((c) => c.name !== 'Todos').map((c) => c.name)].map((cat) => (
+                  <button key={cat} type="button" onClick={() => setPopularCategoryFilter(cat)} className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${popularCategoryFilter === cat ? 'bg-red-600 text-white font-bold' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {availableToAdd.length === 0 ? (
+                <div className="p-6 text-center bg-stone-50 rounded-2xl text-stone-500 text-xs">
+                  {popularSearch ? 'Nenhum lanche encontrado.' : 'Todos os lanches já estão nos Mais Vendidos! 🎉'}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {availableToAdd.map((p) => (
+                    <div key={p.id} className="p-3.5 rounded-2xl bg-white border border-stone-200 shadow-2xs flex flex-col justify-between hover:shadow-md hover:border-red-200 transition-all group">
+                      <div>
+                        <div className="w-full h-28 rounded-xl overflow-hidden bg-stone-100 mb-2 relative">
+                          <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <span className="absolute top-2 left-2 bg-stone-900/80 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">{p.category}</span>
+                        </div>
+                        <h4 className="font-bold text-xs text-stone-900 line-clamp-1">{p.name}</h4>
+                      </div>
+                      <div className="pt-2.5 mt-2 border-t border-stone-100 flex items-center justify-between gap-2">
+                        <span className="font-black text-sm text-stone-900 font-display">{formatBRL(p.options[0]?.price || 0)}</span>
+                        <button type="button" onClick={() => { addPopularProduct(p.id); showNotification(`"${p.name}" adicionado aos Mais Vendidos! 🔥`); }} className="px-3.5 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-xs active:scale-95 transition-all">
+                          <Plus size={13} /> Adicionar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1377,6 +1594,20 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                         </select>
                       </div>
                     </div>
+
+                    {/* Destaque nos Mais Vendidos */}
+                    <button
+                      type="button"
+                      onClick={() => setProdForm((prev) => ({ ...prev, isPopular: !prev.isPopular }))}
+                      className={`w-full py-2.5 px-4 rounded-xl border flex items-center justify-between font-bold text-xs transition-colors ${
+                        prodForm.isPopular
+                          ? 'bg-amber-50 border-amber-300 text-amber-800'
+                          : 'bg-stone-50 border-stone-200 text-stone-600'
+                      }`}
+                    >
+                      <span>{prodForm.isPopular ? '🔥 Exibir nos Mais Vendidos' : 'Não exibir nos Mais Vendidos'}</span>
+                      <span className="text-[10px] underline">Alternar</span>
+                    </button>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
