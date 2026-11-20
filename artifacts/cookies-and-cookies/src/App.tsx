@@ -32,6 +32,7 @@ import {
   Instagram,
   Flame,
   Coffee,
+  Sparkles,
 } from 'lucide-react';
 import { StoreProvider, useStore } from './context/StoreContext';
 import { type Product, type PresentationOption, type Coupon } from './data/menu';
