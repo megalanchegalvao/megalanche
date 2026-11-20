@@ -12,7 +12,7 @@ import {
   INITIAL_HERO,
   INITIAL_CATEGORIES,
 } from '../data/menu';
-import { supabase } from '../lib/supabase';
+import { supabase, uploadProductImageToStorage } from '../lib/supabase';
 
 interface StoreContextType {
   products: Product[];
@@ -274,6 +274,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const activeCouponsCount = coupons.filter((c) => c.isActive).length;
 
   // Processar arquivo de imagem (PNG, JPG, WebP) para Data URL otimizada
+  // Tenta fazer upload para o Supabase Storage para sincronização entre dispositivos.
+  // Em caso de falha, usa base64 local como fallback.
   const processImageFile = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       if (!file.type.startsWith('image/')) {
@@ -290,7 +292,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
 
         const img = new Image();
-        img.onload = () => {
+        img.onload = async () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
@@ -316,6 +318,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
           ctx.drawImage(img, 0, 0, width, height);
           const compressed = canvas.toDataURL('image/jpeg', 0.85);
+
+          // Tenta fazer upload para o Supabase Storage (sincroniza entre dispositivos)
+          try {
+            const publicUrl = await uploadProductImageToStorage(file, compressed);
+            if (publicUrl) {
+              resolve(publicUrl);
+              return;
+            }
+          } catch {
+            // Falha silenciosa, usa fallback local
+          }
+
+          // Fallback: retorna base64 local (funciona apenas neste dispositivo)
           resolve(compressed);
         };
         img.onerror = () => resolve(result);

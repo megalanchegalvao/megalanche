@@ -63,6 +63,63 @@ export const supabase = (() => {
 export const getSupabaseClient = () => supabase;
 
 /**
+ * Faz upload de imagem de produto para o Supabase Storage (bucket 'product-images').
+ * Retorna a URL pública da imagem se bem-sucedido, ou null em caso de falha.
+ * O bucket deve existir e ter política de leitura pública no Supabase.
+ */
+export async function uploadProductImageToStorage(
+  file: File,
+  compressedDataUrl?: string
+): Promise<string | null> {
+  try {
+    // Converte o arquivo ou o data URL para blob para upload
+    let blob: Blob;
+    let ext = 'jpg';
+
+    if (compressedDataUrl && compressedDataUrl.startsWith('data:image/')) {
+      // Usa a versão já comprimida/redimensionada
+      const response = await fetch(compressedDataUrl);
+      blob = await response.blob();
+      ext = compressedDataUrl.includes('image/png') ? 'png' : 'jpg';
+    } else {
+      blob = file;
+      ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      if (!['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) ext = 'jpg';
+    }
+
+    const fileName = `produto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+
+    const { data, error } = await supabase.storage
+      .from('product-images')
+      .upload(fileName, blob, {
+        cacheControl: '31536000',
+        upsert: false,
+        contentType: ext === 'png' ? 'image/png' : 'image/jpeg',
+      });
+
+    if (error) {
+      console.warn('Supabase Storage upload aviso:', error);
+      return null;
+    }
+
+    if (data?.path) {
+      const { data: publicData } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(data.path);
+
+      if (publicData?.publicUrl) {
+        return publicData.publicUrl;
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('Erro ao tentar upload de imagem do produto:', err);
+    return null;
+  }
+}
+
+/**
  * Função para upload de comprovante de pagamento Pix (PDF ou Print/Imagem)
  * Faz upload no bucket 'comprovantes' do Supabase Storage.
  * Possui fallback resiliente caso o bucket do Supabase ainda não tenha sido criado.
@@ -196,7 +253,18 @@ create table if not exists public.megalanche_coupons (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 4. Bucket de Armazenamento para Comprovantes Pix (PDF e Imagens)
+-- 4. Bucket de Armazenamento para Imagens de Produtos
+insert into storage.buckets (id, name, public)
+values ('product-images', 'product-images', true)
+on conflict (id) do nothing;
+
+create policy "Permitir upload publico product-images" on storage.objects
+for insert with check (bucket_id = 'product-images');
+
+create policy "Permitir leitura publica product-images" on storage.objects
+for select using (bucket_id = 'product-images');
+
+-- 5. Bucket de Armazenamento para Comprovantes Pix (PDF e Imagens)
 insert into storage.buckets (id, name, public) 
 values ('comprovantes', 'comprovantes', true)
 on conflict (id) do nothing;
