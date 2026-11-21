@@ -634,32 +634,19 @@ export const INITIAL_PRODUCTS: Product[] = [
   },
 ];
 
-export const INITIAL_COUPONS: Coupon[] = [
-  {
-    id: 'cupom-mega10',
-    code: 'MEGA10',
-    description: '10% de desconto no seu pedido!',
-    type: 'percentage',
-    value: 10,
-    minOrderValue: 30,
-    isActive: true,
-  },
-  {
-    id: 'cupom-primeira-compra',
-    code: 'BEMVINDO',
-    description: 'R$ 5,00 de desconto no primeiro pedido',
-    type: 'fixed',
-    value: 5,
-    minOrderValue: 25,
-    isActive: true,
-  },
-  {
-    id: 'cupom-mega-barca',
-    code: 'MEGABARCA',
-    description: 'R$ 8,00 de desconto especial em Barcas',
-    type: 'fixed',
-    value: 8,
-    minOrderValue: 70,
-    isActive: true,
-  },
-];
+// Identifica se um cupom é mock / enraizado (cupons de teste do template)
+export const isGhostCoupon = (coupon: any): boolean => {
+  if (!coupon) return true;
+  const id = String(coupon.id || '').trim();
+  const code = String(coupon.code || '').trim().toUpperCase();
+  return (
+    id === 'cupom-mega10' ||
+    id === 'cupom-primeira-compra' ||
+    id === 'cupom-mega-barca' ||
+    code === 'MEGA10' ||
+    code === 'BEMVINDO' ||
+    code === 'MEGABARCA'
+  );
+};
+
+export const INITIAL_COUPONS: Coupon[] = [];

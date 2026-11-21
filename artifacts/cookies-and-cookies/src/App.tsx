@@ -15,7 +15,6 @@ import {
   Navigation,
   Lock,
   Search,
-  Bell,
   Menu,
   Home,
   UtensilsCrossed,
@@ -317,17 +316,6 @@ function AppContent() {
               </a>
 
               <button
-                onClick={() => setIsCouponsModalOpen(true)}
-                className="relative w-10 h-10 rounded-full bg-stone-50 hover:bg-stone-100 border border-stone-200/80 flex items-center justify-center text-stone-700 hover:text-red-600 transition-colors"
-                aria-label="Ver Cupons"
-              >
-                <Bell size={18} />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white rounded-full text-[9px] font-bold flex items-center justify-center shadow-xs animate-bounce">
-                  3
-                </span>
-              </button>
-
-              <button
                 onClick={() => setIsBagOpen(true)}
                 className="relative flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full text-xs font-bold shadow-md shadow-red-500/20 active:scale-95 transition-all"
                 aria-label="Ver Sacola"
@@ -449,22 +437,6 @@ function AppContent() {
               <p className="text-xs sm:text-sm md:text-base text-stone-600 max-w-lg leading-relaxed font-medium mx-auto md:mx-0">
                 {heroInfo.subtitle}
               </p>
-              <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-3">
-                <button
-                  onClick={scrollToMenu}
-                  className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-full text-xs sm:text-sm font-bold shadow-md shadow-red-500/20 active:scale-95 transition-transform"
-                >
-                  <span>Pedir Agora</span>
-                  <ArrowRight size={15} />
-                </button>
-                <button
-                  onClick={() => setIsCouponsModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 bg-white hover:bg-stone-50 text-stone-800 border border-stone-200 px-5 py-3 rounded-full text-xs sm:text-sm font-bold shadow-xs transition-colors"
-                >
-                  <Gift size={15} className="text-red-600" />
-                  <span>Ver Cupons</span>
-                </button>
-              </div>
             </div>
 
             {/* Imagem do Banner */}

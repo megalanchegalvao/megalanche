@@ -14,6 +14,7 @@ import {
   cleanProductImage,
   isGhostImage,
   normalizeImages,
+  isGhostCoupon,
 } from '../data/menu';
 import { supabase, uploadProductImageToStorage, uploadBase64ImageToStorage } from '../lib/supabase';
 
@@ -147,7 +148,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [coupons, setCoupons] = useState<Coupon[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.COUPONS);
-      return saved ? JSON.parse(saved) : INITIAL_COUPONS;
+      if (saved) {
+        const parsed: Coupon[] = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((c) => !isGhostCoupon(c));
+        }
+      }
+      return INITIAL_COUPONS;
     } catch {
       return INITIAL_COUPONS;
     }
@@ -314,21 +321,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
 
         const { data: dbCoupons, error: coupErr } = await supabase.from('megalanche_coupons').select('*');
-        if (!coupErr && dbCoupons && dbCoupons.length > 0) {
-          const mappedCoupons: Coupon[] = dbCoupons.map((c: any) => ({
-            id: c.id,
-            code: c.code,
-            description: c.description,
-            type: c.type,
-            value: Number(c.value),
-            minOrderValue: c.min_order_value ? Number(c.min_order_value) : undefined,
-            isActive: c.is_active ?? true,
-          }));
+        if (!coupErr && Array.isArray(dbCoupons)) {
+          const mappedCoupons: Coupon[] = dbCoupons
+            .filter((c: any) => !isGhostCoupon(c))
+            .map((c: any) => ({
+              id: c.id,
+              code: c.code,
+              description: c.description,
+              type: c.type,
+              value: Number(c.value),
+              minOrderValue: c.min_order_value ? Number(c.min_order_value) : undefined,
+              isActive: c.is_active ?? true,
+            }));
           setCoupons(mappedCoupons);
         }
 
         const { data: dbSettings, error: setErr } = await supabase.from('megalanche_settings').select('*').limit(1).maybeSingle();
         if (!setErr && dbSettings) {
+          // Carrega categorias salvas na nuvem para manter fotos sincronizadas em todos os navegadores
+          if (dbSettings.top_alert_text && typeof dbSettings.top_alert_text === 'string' && dbSettings.top_alert_text.startsWith('[')) {
+            try {
+              const parsedCats: CategoryItem[] = JSON.parse(dbSettings.top_alert_text);
+              if (Array.isArray(parsedCats) && parsedCats.length > 0) {
+                setCategories(parsedCats);
+                try {
+                  localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(parsedCats));
+                } catch {}
+              }
+            } catch {}
+          }
+
           setStoreInfo((prev) => ({
             ...prev,
             name: dbSettings.store_name || prev.name,
@@ -553,18 +575,76 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return popularProductIds.includes(productId);
   };
 
-  // Funções de Categorias
+  // Funções de Categorias com persistência na nuvem
   const updateCategory = async (updated: CategoryItem) => {
-    setCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    let finalIcon = updated.icon;
+    if (finalIcon && finalIcon.startsWith('data:image/')) {
+      try {
+        const cloudUrl = await uploadBase64ImageToStorage(finalIcon);
+        if (cloudUrl) {
+          finalIcon = cloudUrl;
+        }
+      } catch (e) {
+        console.warn('Erro ao subir imagem da categoria:', e);
+      }
+    }
+    const cleanCat: CategoryItem = { ...updated, icon: finalIcon };
+    setCategories((prev) => {
+      const next = prev.map((c) => (c.id === cleanCat.id ? cleanCat : c));
+      try {
+        localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(next));
+      } catch {}
+      supabase
+        .from('megalanche_settings')
+        .update({ top_alert_text: JSON.stringify(next) })
+        .eq('id', 'default')
+        .then(() => {})
+        .catch(() => {});
+      return next;
+    });
   };
 
   const addCategory = async (catData: Omit<CategoryItem, 'id'>) => {
+    let finalIcon = catData.icon;
+    if (finalIcon && finalIcon.startsWith('data:image/')) {
+      try {
+        const cloudUrl = await uploadBase64ImageToStorage(finalIcon);
+        if (cloudUrl) {
+          finalIcon = cloudUrl;
+        }
+      } catch {}
+    }
     const newId = `cat-${Date.now().toString(36)}`;
-    setCategories((prev) => [...prev, { ...catData, id: newId }]);
+    const newCat: CategoryItem = { ...catData, id: newId, icon: finalIcon };
+    setCategories((prev) => {
+      const next = [...prev, newCat];
+      try {
+        localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(next));
+      } catch {}
+      supabase
+        .from('megalanche_settings')
+        .update({ top_alert_text: JSON.stringify(next) })
+        .eq('id', 'default')
+        .then(() => {})
+        .catch(() => {});
+      return next;
+    });
   };
 
   const deleteCategory = async (categoryId: string) => {
-    setCategories((prev) => prev.filter((c) => c.id !== categoryId));
+    setCategories((prev) => {
+      const next = prev.filter((c) => c.id !== categoryId);
+      try {
+        localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(next));
+      } catch {}
+      supabase
+        .from('megalanche_settings')
+        .update({ top_alert_text: JSON.stringify(next) })
+        .eq('id', 'default')
+        .then(() => {})
+        .catch(() => {});
+      return next;
+    });
   };
 
   // Funções de Cupons
@@ -712,7 +792,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
 
       // 2. Sincronizar cupons
+      try {
+        await supabase.from('megalanche_coupons').delete().in('id', ['cupom-mega10', 'cupom-primeira-compra', 'cupom-mega-barca']);
+      } catch {}
+
       for (const coupon of coupons) {
+        if (isGhostCoupon(coupon)) continue;
         await supabase.from('megalanche_coupons').upsert([{
           id: coupon.id,
           code: coupon.code,
@@ -724,7 +809,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }]);
       }
 
-      // 3. Sincronizar configurações da loja e Banner Principal
+      // 3. Sincronizar fotos e configurações das categorias
+      let finalCategories = categories;
+      try {
+        finalCategories = await Promise.all(
+          categories.map(async (cat) => {
+            if (cat.icon && cat.icon.startsWith('data:image/')) {
+              try {
+                const cloudCat = await uploadBase64ImageToStorage(cat.icon);
+                if (cloudCat) return { ...cat, icon: cloudCat };
+              } catch {}
+            }
+            return cat;
+          })
+        );
+        setCategories(finalCategories);
+        try {
+          localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(finalCategories));
+        } catch {}
+      } catch {}
+
+      // 4. Sincronizar configurações da loja e Banner Principal
       let finalHeroImage = heroInfo.image;
       if (finalHeroImage && finalHeroImage.startsWith('data:image/')) {
         try {
@@ -759,6 +864,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         instagram_handle: storeInfo.instagramHandle,
         instagram_url: storeInfo.instagramUrl,
         logo_image: finalLogoImage,
+        top_alert_text: JSON.stringify(finalCategories),
         opening_hours: storeInfo.openingHours,
         admin_pin: storeInfo.adminPin,
         hero_title: heroInfo.title,

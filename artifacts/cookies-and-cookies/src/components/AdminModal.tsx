@@ -19,6 +19,8 @@ import {
   Sparkles,
   X,
   Flame,
+  UtensilsCrossed,
+  Coffee,
   ArrowUp,
   ArrowDown,
   Database,
@@ -1255,12 +1257,31 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                   key={c.id}
                   className="p-5 rounded-3xl bg-white border border-stone-200/80 shadow-xs flex flex-col items-center text-center justify-between gap-3 hover:shadow-md transition-all"
                 >
-                  <div className="w-20 h-20 rounded-full p-1 ring-4 ring-red-600 bg-white overflow-hidden shadow-xs">
-                    <img
-                      src={c.icon}
-                      alt={c.name}
-                      className="w-full h-full object-cover rounded-full"
-                    />
+                  <div className="w-20 h-20 rounded-full p-1 ring-4 ring-red-600 bg-white overflow-hidden shadow-xs flex items-center justify-center">
+                    {c.icon ? (
+                      <img
+                        src={c.icon}
+                        alt={c.name}
+                        className="w-full h-full object-cover rounded-full"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-stone-50 flex items-center justify-center">
+                        {c.name === 'Barcas' ? (
+                          <Flame size={28} className="text-amber-600" />
+                        ) : c.name === 'Lanches' ? (
+                          <UtensilsCrossed size={28} className="text-red-600" />
+                        ) : c.name === 'Pastéis' ? (
+                          <Sparkles size={28} className="text-amber-500" />
+                        ) : c.name === 'Bebidas' ? (
+                          <Coffee size={28} className="text-blue-500" />
+                        ) : (
+                          <Store size={28} className="text-red-600" />
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -1268,7 +1289,7 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
                       {c.name}
                     </h4>
                     <span className="text-[10px] text-stone-400">
-                      Foto circular ativa
+                      {c.icon ? 'Foto circular ativa' : 'Sem foto (ícone ativo)'}
                     </span>
                   </div>
 
@@ -1844,6 +1865,12 @@ export function AdminModal({ isOpen, onClose }: AdminModalProps) {
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {coupons.length === 0 && (
+                <div className="col-span-full py-10 text-center text-xs text-stone-500 bg-stone-50 rounded-3xl border-2 border-dashed border-stone-200 p-6 space-y-1">
+                  <p className="font-bold text-stone-700">Nenhum cupom cadastrado no momento.</p>
+                  <p className="text-stone-400">Clique no botão "+ Novo Cupom" acima caso queira criar cupons promocionais para seus clientes.</p>
+                </div>
+              )}
               {coupons.map((c) => (
                 <div
                   key={c.id}
